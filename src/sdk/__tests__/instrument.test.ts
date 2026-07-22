@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import { instrumentClient } from '../instrument'
 import { Session } from '../session'
-import type { MockChannel } from './mock-client'
-import { MockClient } from './mock-client'
+import type { MockChannel } from '../../testing/fake-ably'
+import { MockClient } from '../../testing/fake-ably'
 
 function setup() {
   const client = new MockClient()

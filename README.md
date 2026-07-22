@@ -138,6 +138,35 @@ present at runtime but is not in ably-js's public typings, so it is
 feature-detected — if it is missing, the panel disables the toggle and says so.
 It is off by default because level 4 is genuinely noisy and slows the SDK.
 
+## Example app
+
+`example/` is a runnable Expo app that exercises the plugin with **no Ably
+account, no API key, and no login**. The Ably client is a fake that produces
+realistic traffic; everything else is real — it goes through the actual
+`useAblyDevTools` hook and the actual Rozenite bridge, so the panel shows
+exactly what a production app produces.
+
+```bash
+bun install && bun run build   # in the repo root — the panel is served from dist/
+cd example
+bun install                    # symlinks the plugin (see scripts/link-plugin.mjs)
+bun start                      # then press `j`, and pick the "Ably" tab
+```
+
+The app has buttons for the cases worth eyeballing: nested session events, a 25-message
+burst, an outgoing publish, presence churn, a non-JSON payload, an oversized
+payload that hits truncation, a channel failing with error `40160`, a full
+disconnect/recover cycle, and a channel release.
+
+Two wiring details worth knowing if you adapt this setup:
+
+- Rozenite discovers plugins from the project's **declared `package.json`
+  dependencies** — it does not crawl `node_modules`. Since the plugin lives one
+  directory up, `metro.config.js` names it via `include: ['rozenite-plugin-ably']`.
+- Metro resolves the bare specifier to the plugin's TypeScript **source**, so SDK
+  edits hot reload. Panel edits still need `bun run build` in the root, because
+  the panel is served from `dist/`.
+
 ## Development
 
 ```bash
@@ -146,6 +175,13 @@ bun test        # instrumentation test suite
 bun typecheck
 bun run build
 ```
+
+`bun dev` starts Rozenite's browser dev host on
+[localhost:8888](http://localhost:8888) for quick panel iteration. Note that
+`rozenite.config.ts` **cannot import anything** — Rozenite evaluates it with
+`new Function('module','exports', code)` and no `require` in scope — so the dev
+presets there are literal payloads. Realistic traffic lives in `example/`
+instead, where it can import the real SDK.
 
 To iterate against a real app:
 

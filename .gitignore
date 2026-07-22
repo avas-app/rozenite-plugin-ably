@@ -4,3 +4,5 @@ build
 *.tsbuildinfo
 .DS_Store
 .rozenite
+example/node_modules
+example/.expo

@@ -1,9 +1,13 @@
-import type { ClientLike } from '../instrument'
+import type { ClientLike } from '../sdk/instrument'
 
 /**
  * A hand-written stand-in for `Ably.Realtime` that mirrors the parts of the
- * real SDK's shape that the instrumentation touches, plus test-only helpers
- * (`deliver`, `setState`) for driving inbound traffic.
+ * real SDK's shape that the instrumentation touches, plus helpers (`deliver`,
+ * `setState`) for driving inbound traffic.
+ *
+ * Shared by the unit tests and by the `rozenite dev` scenario harness, so the
+ * panel is always developed against the same wire format the real SDK produces
+ * rather than against hand-maintained fixtures that can drift.
  *
  * Kept faithful to ably-js semantics in the ways that matter:
  *  - `channels.get(name)` returns the *same* object for a given name.

@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Ably DevTools Example",
+    "slug": "rozenite-plugin-ably-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.rozenite.ablyexample"
+    },
+    "android": {
+      "package": "dev.rozenite.ablyexample"
+    }
+  }
+}
