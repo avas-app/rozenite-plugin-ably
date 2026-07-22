@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useColorScheme,
 } from 'react-native'
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { useAblyDevTools } from 'rozenite-plugin-ably'
 // Imported by path, not from the package: the scenario driver is example
@@ -72,8 +75,9 @@ export default function App() {
   const theme = isDark ? dark : light
 
   return (
-    <SafeAreaView style={[styles.root, theme.root]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
+    <SafeAreaProvider>
+      <SafeAreaView style={[styles.root, theme.root]} edges={['top', 'bottom']}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.title, theme.text]}>Ably DevTools Example</Text>
         <Text style={[styles.subtitle, theme.dim]}>
@@ -136,8 +140,9 @@ export default function App() {
             </View>
           </>
         ) : null}
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   )
 }
 
