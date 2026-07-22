@@ -33,7 +33,18 @@
     "Liberation Mono", monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  --row: 22px;
+  /*
+   * Type scale. Everything sizes off these four values, so the whole panel can
+   * be scaled from one place rather than by chasing magic numbers. Sizes are
+   * deliberately above typical devtools density — legibility beats fitting one
+   * more row on screen.
+   */
+  --fs-xs: 11px; /* uppercase micro-labels */
+  --fs-sm: 12px; /* secondary metadata, chips */
+  --fs-md: 13px; /* body, table rows, JSON */
+  --fs-lg: 15px; /* section headings */
+
+  --row: 26px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -74,7 +85,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: var(--fs-md);
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -92,7 +104,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 0 10px;
-  height: 34px;
+  height: 38px;
   flex: 0 0 auto;
   background: var(--bg-raised);
   border-bottom: 1px solid var(--border);
@@ -114,7 +126,7 @@ body {
 .bar-label {
   color: var(--text-faint);
   text-transform: uppercase;
-  font-size: 9px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
 }
 
@@ -135,7 +147,7 @@ body {
 .bar-code {
   font-family: var(--mono);
   color: var(--text-dim);
-  max-width: 130px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -254,7 +266,7 @@ body {
 
 .mini {
   font: inherit;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   background: transparent;
   border: 1px solid var(--border);
@@ -322,7 +334,7 @@ body {
 /* ---------------------------------------------------------------- channels */
 
 .channels {
-  flex: 0 0 268px;
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -391,7 +403,7 @@ body {
 
 .channel-name {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -406,7 +418,7 @@ body {
 }
 
 .channel-state {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -427,7 +439,7 @@ body {
 }
 
 .channel-dim {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -443,7 +455,7 @@ body {
 }
 
 .tag {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--bg-active);
@@ -457,7 +469,7 @@ body {
 }
 
 .channel-error {
-  font-size: 10px;
+  font-size: var(--fs-sm);
   color: var(--bad);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -495,7 +507,7 @@ body {
 
 .chip {
   font: inherit;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   padding: 2px 7px;
   border-radius: 9px;
   border: 1px solid var(--border);
@@ -512,7 +524,7 @@ body {
 
 .stream-count {
   padding: 3px 8px;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   border-bottom: 1px solid var(--border-soft);
   font-variant-numeric: tabular-nums;
@@ -531,7 +543,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-md);
 }
 
 .row {
@@ -562,7 +574,7 @@ body {
 
 .cell-time {
   color: var(--text-faint);
-  width: 84px;
+  width: 100px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -583,11 +595,11 @@ body {
 }
 
 .cell-kind {
-  width: 46px;
+  width: 56px;
 }
 
 .kind {
-  font-size: 9px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-faint);
@@ -616,7 +628,7 @@ body {
 }
 
 .cell-size {
-  width: 66px;
+  width: 78px;
   text-align: right;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
@@ -662,7 +674,7 @@ body {
 
 .detail-channel {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -685,7 +697,7 @@ body {
 
 .toggle-btn {
   font: inherit;
-  font-size: 10px;
+  font-size: var(--fs-sm);
   padding: 2px 8px;
   background: transparent;
   border: none;
@@ -721,7 +733,7 @@ body {
 
 .meta-label {
   margin: 0;
-  font-size: 9px;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-faint);
@@ -730,7 +742,7 @@ body {
 .meta-value {
   margin: 0;
   color: var(--text-dim);
-  max-width: 220px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -738,7 +750,7 @@ body {
 
 .meta-mono {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: var(--fs-sm);
 }
 
 .detail-error {
@@ -755,7 +767,7 @@ body {
 .notice {
   padding: 4px 8px;
   color: var(--warn);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -768,7 +780,7 @@ body {
 .raw {
   margin: 0;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-md);
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text-dim);
@@ -788,8 +800,8 @@ body {
 
 .json-tree {
   font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: var(--fs-md);
+  line-height: 1.6;
 }
 
 .json-row {
@@ -808,9 +820,9 @@ body {
 
 .json-caret {
   display: inline-block;
-  width: 10px;
+  width: 12px;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: var(--fs-xs);
   transition: transform 0.12s ease;
 }
 

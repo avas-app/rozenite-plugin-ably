@@ -1,8 +1,24 @@
 {
   "name": "rozenite-plugin-ably",
   "version": "0.1.0",
-  "description": "Ably Realtime inspector for React Native DevTools — channels, message stream, and payload preview.",
+  "description": "Ably Realtime inspector for React Native DevTools — inspect channels, stream live events, and preview decoded payloads.",
   "type": "module",
+  "license": "MIT",
+  "homepage": "https://github.com/avas-app/rozenite-plugin-ably#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avas-app/rozenite-plugin-ably.git"
+  },
+  "bugs": {
+    "url": "https://github.com/avas-app/rozenite-plugin-ably/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
   "main": "./dist/react-native/index.cjs",
   "module": "./dist/react-native/index.js",
   "types": "./dist/react-native/index.d.ts",
@@ -30,7 +46,8 @@
     "build": "rozenite build",
     "dev": "rozenite dev",
     "test": "bun test src/",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "tsc -p tsconfig.json --noEmit && rozenite build"
   },
   "dependencies": {
     "@rozenite/plugin-bridge": "^1.13.0"
@@ -51,6 +68,5 @@
   "peerDependencies": {
     "react": "*",
     "react-native": "*"
-  },
-  "license": "MIT"
+  }
 }
