@@ -235,4 +235,12 @@ export type AblyDevToolsEventMap = {
   'ably:channel-action': { action: ChannelAction; channel: string }
 }
 
-export const PLUGIN_ID = 'rozenite-plugin-ably'
+/**
+ * Bridge identifier, matched on both ends of the DevTools connection.
+ *
+ * It only has to agree between the app and the panel, but it must not collide
+ * with another plugin — so it mirrors the package name, which is what the
+ * official Rozenite plugins do (`@rozenite/mmkv-plugin`, etc.). Keep it in step
+ * with `name` in package.json.
+ */
+export const PLUGIN_ID = '@avasapp/rozenite-plugin-ably'

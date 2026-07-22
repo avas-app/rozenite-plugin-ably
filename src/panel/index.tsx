@@ -88,7 +88,7 @@ export default function AblyPanel() {
         <div className="empty empty-page">
           <p>Waiting for an instrumented Ably client.</p>
           <pre className="raw raw-hint">
-            {`import { useAblyDevTools } from 'rozenite-plugin-ably'
+            {`import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
 
 useAblyDevTools(ablyRealtimeClient)`}
           </pre>

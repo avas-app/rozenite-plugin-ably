@@ -37,7 +37,7 @@ const SINGLETONS = ['react', 'react-dom', 'react-native']
 const exampleOrigin = path.join(projectRoot, 'index.ts')
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'rozenite-plugin-ably') {
+  if (moduleName === '@avasapp/rozenite-plugin-ably') {
     return { type: 'sourceFile', filePath: pluginEntry }
   }
 
@@ -62,5 +62,5 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 // the symlink created by scripts/link-plugin.mjs.
 module.exports = withRozenite(config, {
   enabled: true,
-  include: ['rozenite-plugin-ably'],
+  include: ['@avasapp/rozenite-plugin-ably'],
 })

@@ -12,7 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { useAblyDevTools } from 'rozenite-plugin-ably'
+import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
 // Imported by path, not from the package: the scenario driver is example
 // infrastructure and deliberately not part of the plugin's public API.
 import {
@@ -26,7 +26,7 @@ import {
 } from '../src/dev/scenario'
 
 /**
- * Example app for `rozenite-plugin-ably`.
+ * Example app for `@avasapp/rozenite-plugin-ably`.
  *
  * The Ably client here is a fake — it produces realistic traffic with no
  * network, no API key, and no login. Everything else is real: the client is

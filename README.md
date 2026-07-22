@@ -1,4 +1,4 @@
-# rozenite-plugin-ably
+# @avasapp/rozenite-plugin-ably
 
 An [Ably](https://ably.com) Realtime inspector for React Native DevTools, built on
 [Rozenite](https://www.rozenite.dev).
@@ -21,7 +21,7 @@ means answering different questions:
 ## Install
 
 ```bash
-npm install --save-dev rozenite-plugin-ably
+npm install --save-dev @avasapp/rozenite-plugin-ably
 ```
 
 Rozenite discovers the plugin automatically. No `metro.config` change is needed
@@ -33,7 +33,7 @@ Call the hook once, anywhere in your component tree, with your `Ably.Realtime`
 client:
 
 ```ts
-import { useAblyDevTools } from 'rozenite-plugin-ably'
+import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
 
 function DevTools() {
   useAblyDevTools(ablyRealtimeClient)
@@ -162,7 +162,7 @@ Two wiring details worth knowing if you adapt this setup:
 
 - Rozenite discovers plugins from the project's **declared `package.json`
   dependencies** — it does not crawl `node_modules`. Since the plugin lives one
-  directory up, `metro.config.js` names it via `include: ['rozenite-plugin-ably']`.
+  directory up, `metro.config.js` names it via `include: ['@avasapp/rozenite-plugin-ably']`.
 - Metro resolves the bare specifier to the plugin's TypeScript **source**, so SDK
   edits hot reload. Panel edits still need `bun run build` in the root, because
   the panel is served from `dist/`.
@@ -187,8 +187,8 @@ To iterate against a real app:
 
 ```bash
 bun link                                   # in this repo
-cd ../your-app && bun link rozenite-plugin-ably
-ROZENITE_DEV_MODE=rozenite-plugin-ably bun dev
+cd ../your-app && bun link @avasapp/rozenite-plugin-ably
+ROZENITE_DEV_MODE=@avasapp/rozenite-plugin-ably bun dev
 ```
 
 ## License

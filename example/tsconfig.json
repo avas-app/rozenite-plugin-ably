@@ -6,7 +6,7 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "rozenite-plugin-ably": ["../react-native.ts"]
+      "@avasapp/rozenite-plugin-ably": ["../react-native.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

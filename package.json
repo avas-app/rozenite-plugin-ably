@@ -1,5 +1,5 @@
 {
-  "name": "rozenite-plugin-ably",
+  "name": "@avasapp/rozenite-plugin-ably",
   "version": "0.1.0",
   "description": "Ably Realtime inspector for React Native DevTools — inspect channels, stream live events, and preview decoded payloads.",
   "type": "module",

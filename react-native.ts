@@ -2,7 +2,7 @@
  * React Native entry point.
  *
  * Built to `dist/react-native/index.{js,cjs,d.ts}` and consumed as
- * `import { useAblyDevTools } from 'rozenite-plugin-ably'`.
+ * `import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'`.
  *
  * Note there is no `ably` dependency anywhere in this package — the client is
  * typed structurally, so the plugin works against whatever ably-js version the

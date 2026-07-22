@@ -17,15 +17,31 @@ import { fileURLToPath } from 'node:url'
  */
 const exampleRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const pluginRoot = path.resolve(exampleRoot, '..')
-const target = path.join(exampleRoot, 'node_modules', 'rozenite-plugin-ably')
 
+const { name: packageName } = JSON.parse(
+  fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'),
+)
+
+const nodeModules = path.join(exampleRoot, 'node_modules')
+const target = path.join(nodeModules, ...packageName.split('/'))
+
+// A scoped name needs its @scope directory to exist first.
 fs.mkdirSync(path.dirname(target), { recursive: true })
 
-if (fs.existsSync(target) || fs.lstatSync(target, { throwIfNoEntry: false })) {
+if (fs.lstatSync(target, { throwIfNoEntry: false })) {
   fs.rmSync(target, { recursive: true, force: true })
 }
 
 fs.symlinkSync(pluginRoot, target, 'dir')
+
+// Clear a link left behind by an earlier, differently-named version of the
+// package, so stale copies cannot shadow the real one during resolution.
+for (const stale of ['rozenite-plugin-ably']) {
+  const stalePath = path.join(nodeModules, stale)
+  if (stalePath !== target && fs.lstatSync(stalePath, { throwIfNoEntry: false })) {
+    fs.rmSync(stalePath, { recursive: true, force: true })
+  }
+}
 
 const manifest = path.join(pluginRoot, 'dist', 'rozenite.json')
 if (!fs.existsSync(manifest)) {
@@ -33,5 +49,5 @@ if (!fs.existsSync(manifest)) {
     '[example] linked, but the plugin is not built yet — run `bun run build` in the repo root, or the Ably panel will not appear.',
   )
 } else {
-  console.log('[example] linked rozenite-plugin-ably ->', pluginRoot)
+  console.log(`[example] linked ${packageName} ->`, pluginRoot)
 }

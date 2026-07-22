@@ -24,7 +24,7 @@ import type { Session } from './session'
  * has no runtime or type dependency on the SDK version in the host app.
  */
 
-const INSTRUMENTED = Symbol.for('rozenite-plugin-ably.instrumented')
+const INSTRUMENTED = Symbol.for('@avasapp/rozenite-plugin-ably.instrumented')
 
 /**
  * Deliberately loose. This is the interop boundary with an SDK we do not
