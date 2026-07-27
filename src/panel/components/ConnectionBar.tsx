@@ -1,127 +1,92 @@
-import type { Capabilities, ConnectionSnapshot, SdkOptions, SessionStats } from '../../shared/types'
-import { connectionTone, formatDuration } from '../format'
+import { Chip, Separator, Surface } from '@rozenite/ui'
+import { AlertTriangle } from 'lucide-react'
+
+import type { ConnectionSnapshot, SessionStats } from '../../shared/types'
+import { connectionTone, formatDuration, toneChipColor } from '../format'
+import { MetaItem, WithTooltip } from './primitives'
 
 type ConnectionBarProps = {
   connection: ConnectionSnapshot
   stats: SessionStats
-  options: SdkOptions
-  capabilities: Capabilities
   channelCount: number
   attachedCount: number
-  onClear: () => void
-  onTogglePause: () => void
-  onToggleProtocol: () => void
 }
 
 /**
  * The always-visible status strip. Its job is to answer "is realtime healthy
  * right now?" at a glance, so the connection state and any error reason are the
  * only things allowed to be visually loud.
+ *
+ * Capture controls used to live here; they now sit in the `PluginHeader`
+ * actions slot so this strip is purely a readout.
  */
 export function ConnectionBar({
   connection,
   stats,
-  options,
-  capabilities,
   channelCount,
   attachedCount,
-  onClear,
-  onTogglePause,
-  onToggleProtocol,
 }: ConnectionBarProps) {
   const tone = connectionTone(connection.state)
   const elapsed = formatDuration(Date.now() - connection.since)
 
   return (
-    <header className="bar">
-      <div className="bar-group">
-        <span className={`pill pill-${tone}`}>
-          <span className="dot" />
+    <Surface
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-2"
+      variant="secondary"
+    >
+      <div className="flex items-center gap-2">
+        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
           {connection.state}
-        </span>
-        <span className="bar-elapsed" title="Time in current state">
-          {elapsed}
-        </span>
+        </Chip>
+        <WithTooltip content="Time in current state">
+          <span className="text-xs tabular-nums text-muted">{elapsed}</span>
+        </WithTooltip>
       </div>
 
+      <Separator className="h-4" orientation="vertical" />
+
       {connection.id ? (
-        <div className="bar-group bar-meta">
-          <span className="bar-label">id</span>
-          <code className="bar-code" title={connection.id}>
-            {connection.id}
-          </code>
-        </div>
+        <MetaItem label="id" mono>
+          {connection.id}
+        </MetaItem>
       ) : null}
 
       {connection.clientId ? (
-        <div className="bar-group bar-meta">
-          <span className="bar-label">client</span>
-          <code className="bar-code" title={connection.clientId}>
-            {connection.clientId}
-          </code>
-        </div>
+        <MetaItem label="client" mono>
+          {connection.clientId}
+        </MetaItem>
       ) : null}
 
-      <div className="bar-group bar-meta">
-        <span className="bar-label">channels</span>
-        <span className="bar-value">
-          {attachedCount}
-          <span className="bar-dim"> / {channelCount}</span>
-        </span>
-      </div>
+      <MetaItem label="channels">
+        <span className="tabular-nums">{attachedCount}</span>
+        <span className="text-muted"> / {channelCount}</span>
+      </MetaItem>
 
-      <div className="bar-group bar-meta">
-        <span className="bar-label">in</span>
-        <span className="bar-value">{stats.messagesIn}</span>
-        <span className="bar-label">out</span>
-        <span className="bar-value">{stats.messagesOut}</span>
-        {stats.errors > 0 ? (
-          <>
-            <span className="bar-label">err</span>
-            <span className="bar-value bar-value-bad">{stats.errors}</span>
-          </>
-        ) : null}
-      </div>
+      <MetaItem label="in">
+        <span className="tabular-nums">{stats.messagesIn}</span>
+      </MetaItem>
+
+      <MetaItem label="out">
+        <span className="tabular-nums">{stats.messagesOut}</span>
+      </MetaItem>
+
+      {stats.errors > 0 ? (
+        <MetaItem label="err">
+          <span className="tabular-nums text-danger">{stats.errors}</span>
+        </MetaItem>
+      ) : null}
 
       {connection.reason ? (
-        <div className="bar-reason" title={connection.reason.message}>
-          <strong>
-            {connection.reason.code ? `${connection.reason.code} ` : ''}
-          </strong>
-          {connection.reason.message}
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-danger">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          <span className="truncate" title={connection.reason.message}>
+            {connection.reason.code ? (
+              <strong className="font-semibold">{connection.reason.code} </strong>
+            ) : null}
+            {connection.reason.message}
+          </span>
         </div>
       ) : null}
-
-      <div className="bar-spacer" />
-
-      <div className="bar-group bar-actions">
-        <button
-          type="button"
-          className={`btn${options.paused ? ' btn-active' : ''}`}
-          onClick={onTogglePause}
-          title={options.paused ? 'Resume capture' : 'Pause capture'}
-        >
-          {options.paused ? '▶ Resume' : '⏸ Pause'}
-        </button>
-
-        <button
-          type="button"
-          className={`btn${options.captureProtocol ? ' btn-active' : ''}`}
-          onClick={onToggleProtocol}
-          disabled={!capabilities.protocol}
-          title={
-            capabilities.protocol
-              ? 'Capture raw ably-js protocol frames (verbose, slows the SDK)'
-              : 'This ably-js build does not expose a runtime log handler'
-          }
-        >
-          Protocol
-        </button>
-
-        <button type="button" className="btn" onClick={onClear} title="Clear captured events">
-          Clear
-        </button>
-      </div>
-    </header>
+    </Surface>
   )
 }

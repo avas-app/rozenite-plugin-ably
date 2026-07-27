@@ -37,6 +37,37 @@ export function formatBytes(bytes?: number): string {
  */
 export type Tone = 'good' | 'warn' | 'bad' | 'idle' | 'busy'
 
+/** `Chip`'s colour scale, mapped from our semantic tones. */
+export type ChipColor = 'success' | 'warning' | 'danger' | 'default' | 'accent'
+
+const TONE_CHIP_COLOR: Record<Tone, ChipColor> = {
+  good: 'success',
+  warn: 'warning',
+  bad: 'danger',
+  idle: 'default',
+  busy: 'accent',
+}
+
+export function toneChipColor(tone: Tone): ChipColor {
+  return TONE_CHIP_COLOR[tone]
+}
+
+/**
+ * Tailwind text colour for a tone, for the places a full `Chip` would be too
+ * heavy — status dots and dense table cells.
+ */
+const TONE_TEXT_CLASS: Record<Tone, string> = {
+  good: 'text-success',
+  warn: 'text-warning',
+  bad: 'text-danger',
+  idle: 'text-muted',
+  busy: 'text-accent',
+}
+
+export function toneTextClass(tone: Tone): string {
+  return TONE_TEXT_CLASS[tone]
+}
+
 export function channelTone(state: ChannelState, released: boolean): Tone {
   if (released) return 'idle'
   switch (state) {

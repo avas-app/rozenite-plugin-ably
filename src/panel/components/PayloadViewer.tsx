@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react'
+import {
+  Button,
+  Chip,
+  JsonInspector,
+  Surface,
+  Tabs,
+  useCopyToClipboard,
+} from '@rozenite/ui'
+import {
+  AlertTriangle,
+  Check,
+  Copy,
+  ExternalLink,
+  MousePointerClick,
+} from 'lucide-react'
 
 import type { AblyEvent } from '../../shared/types'
-import { formatBytes, formatTime } from '../format'
-import { JsonTree } from './JsonTree'
+import { eventTone, formatBytes, formatTime, toneChipColor } from '../format'
+import { expandForQuery } from '../json-search'
+import { MetaItem } from './primitives'
 
 type PayloadViewerProps = {
   event: AblyEvent | null
-  /** Shared with the stream search so a hit stays highlighted when selected. */
+  /** Shared with the stream search so a hit stays expanded when selected. */
   query: string
 }
 
@@ -18,33 +34,35 @@ type Mode = 'tree' | 'raw'
  * Ably delivers most payloads as a JSON *string*, which is why the network
  * inspector shows one unreadable escaped line. The SDK parses it and keeps the
  * original, so this pane can offer a real tree by default and the exact bytes
- * on demand — the "raw" toggle is only enabled when the two actually differ.
+ * on demand — the "raw" tab is only enabled when the two actually differ.
  */
 export function PayloadViewer({ event, query }: PayloadViewerProps) {
   const [mode, setMode] = useState<Mode>('tree')
-  const [copied, setCopied] = useState(false)
+  const { copy, isCopied } = useCopyToClipboard(1400)
 
-  useEffect(() => {
-    setCopied(false)
-  }, [event?.id])
+  const payload = event?.payload
+  const hasRaw = typeof payload?.raw === 'string'
+  const isStructured = payload?.kind === 'json'
 
+  // A newly selected event may not support the current tab.
   useEffect(() => {
-    if (!copied) return
-    const id = setTimeout(() => setCopied(false), 1400)
-    return () => clearTimeout(id)
-  }, [copied])
+    if (mode === 'tree' && !isStructured && hasRaw) setMode('raw')
+    if (mode === 'raw' && !hasRaw && isStructured) setMode('tree')
+  }, [mode, isStructured, hasRaw])
 
   if (!event) {
     return (
-      <section className="detail">
-        <div className="empty">Select an event to inspect its payload.</div>
-      </section>
+      <Surface
+        className="flex w-1/2 shrink-0 flex-col items-center justify-center gap-2 border-l border-border px-4 text-center"
+        variant="secondary"
+      >
+        <MousePointerClick className="size-5 text-muted" />
+        <span className="text-sm text-muted">
+          Select an event to inspect its payload.
+        </span>
+      </Surface>
     )
   }
-
-  const payload = event.payload
-  const hasRaw = typeof payload?.raw === 'string'
-  const isStructured = payload?.kind === 'json'
 
   const copyText = () => {
     if (!payload) return ''
@@ -59,105 +77,144 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
     return String(payload.value ?? '')
   }
 
-  const onCopy = () => {
-    const text = copyText()
-    // `navigator.clipboard` is unavailable in some embedded devtools contexts.
-    void navigator.clipboard
-      ?.writeText(text)
-      .then(() => setCopied(true))
-      .catch(() => setCopied(false))
-  }
+  const tone = eventTone(event)
 
   return (
-    <section className="detail">
-      <div className="detail-head">
-        <div className="detail-title">
-          <span className="detail-name">{event.name ?? event.summary}</span>
+    <Surface
+      className="flex w-1/2 shrink-0 flex-col border-l border-border"
+      variant="secondary"
+    >
+      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="truncate text-sm font-semibold text-foreground">
+            {event.name ?? event.summary}
+          </span>
           {event.channel ? (
-            <code className="detail-channel">{event.channel}</code>
+            <code className="truncate rounded bg-surface-tertiary px-1.5 py-0.5 font-mono text-xs text-muted">
+              {event.channel}
+            </code>
           ) : null}
         </div>
 
-        <div className="detail-actions">
-          {isStructured || hasRaw ? (
-            <div className="toggle">
-              <button
-                type="button"
-                className={`toggle-btn${mode === 'tree' ? ' toggle-on' : ''}`}
-                onClick={() => setMode('tree')}
-                disabled={!isStructured}
-              >
-                Tree
-              </button>
-              <button
-                type="button"
-                className={`toggle-btn${mode === 'raw' ? ' toggle-on' : ''}`}
-                onClick={() => setMode('raw')}
-                disabled={!hasRaw}
-                title={hasRaw ? 'Original payload text' : 'No distinct raw form'}
-              >
-                Raw
-              </button>
-            </div>
-          ) : null}
-          {payload ? (
-            <button type="button" className="btn" onClick={onCopy}>
-              {copied ? '✓ Copied' : 'Copy'}
-            </button>
-          ) : null}
-        </div>
+        {payload ? (
+          <Button
+            onPress={() => {
+              void copy(copyText()).catch(() => {})
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            {isCopied ? (
+              <Check className="size-4 text-success" />
+            ) : (
+              <Copy className="size-4" />
+            )}
+            {isCopied ? 'Copied' : 'Copy'}
+          </Button>
+        ) : null}
       </div>
 
-      <dl className="meta">
-        <Meta label="time" value={formatTime(event.ts)} />
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border px-3 py-2">
+        <MetaItem label="time">{formatTime(event.ts)}</MetaItem>
         {event.timestamp ? (
-          <Meta label="server" value={formatTime(event.timestamp)} />
+          <MetaItem label="server">{formatTime(event.timestamp)}</MetaItem>
         ) : null}
-        <Meta label="kind" value={event.kind} />
-        <Meta label="dir" value={event.dir} />
-        {event.messageId ? <Meta label="id" value={event.messageId} mono /> : null}
-        {event.clientId ? <Meta label="client" value={event.clientId} mono /> : null}
+        <MetaItem label="kind">
+          <Chip color={toneChipColor(tone)} size="sm" variant="soft">
+            {event.kind}
+          </Chip>
+        </MetaItem>
+        <MetaItem label="dir">{event.dir}</MetaItem>
+        {event.messageId ? (
+          <MetaItem label="id" mono>
+            {event.messageId}
+          </MetaItem>
+        ) : null}
+        {event.clientId ? (
+          <MetaItem label="client" mono>
+            {event.clientId}
+          </MetaItem>
+        ) : null}
         {event.connectionId ? (
-          <Meta label="conn" value={event.connectionId} mono />
+          <MetaItem label="conn" mono>
+            {event.connectionId}
+          </MetaItem>
         ) : null}
         {payload?.byteLength !== undefined ? (
-          <Meta label="size" value={formatBytes(payload.byteLength)} />
+          <MetaItem label="size">{formatBytes(payload.byteLength)}</MetaItem>
         ) : null}
         {payload?.encoding ? (
-          <Meta label="encoding" value={payload.encoding} mono />
+          <MetaItem label="encoding" mono>
+            {payload.encoding}
+          </MetaItem>
         ) : null}
-      </dl>
+      </div>
 
       {event.error ? (
-        <div className="detail-error">
-          <strong>
-            {event.error.code ? `${event.error.code} ` : ''}
-            {event.error.statusCode ? `(HTTP ${event.error.statusCode}) ` : ''}
-          </strong>
-          {event.error.message}
-          {event.error.href ? (
-            <a
-              className="detail-link"
-              href={event.error.href}
-              target="_blank"
-              rel="noreferrer"
-            >
-              docs ↗
-            </a>
-          ) : null}
+        <div className="flex items-start gap-2 border-b border-border bg-danger/10 px-3 py-2 text-xs text-danger">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          <div className="min-w-0">
+            <strong className="font-semibold">
+              {event.error.code ? `${event.error.code} ` : ''}
+              {event.error.statusCode ? `(HTTP ${event.error.statusCode}) ` : ''}
+            </strong>
+            {event.error.message}
+            {event.error.href ? (
+              <a
+                className="ml-1.5 inline-flex items-center gap-0.5 underline underline-offset-2"
+                href={event.error.href}
+                rel="noreferrer"
+                target="_blank"
+              >
+                docs
+                <ExternalLink className="size-3" />
+              </a>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
       {payload?.truncated ? (
-        <div className="notice">
+        <div className="border-b border-border bg-warning/10 px-3 py-2 text-xs text-warning">
           Payload exceeded the capture limit and was truncated.
         </div>
       ) : null}
 
-      <div className="detail-body">
-        <PayloadBody event={event} mode={mode} query={query} />
-      </div>
-    </section>
+      {isStructured || hasRaw ? (
+        <Tabs
+          className="min-h-0 flex-1"
+          onSelectionChange={(key) => setMode(String(key) as Mode)}
+          selectedKey={mode}
+        >
+          <Tabs.ListContainer className="px-3 pt-2">
+            {/*
+              `Tabs.Indicator` reads the per-tab selection context, so it goes
+              inside each tab rather than alongside them.
+            */}
+            <Tabs.List aria-label="Payload view">
+              <Tabs.Tab id="tree" isDisabled={!isStructured}>
+                Tree
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="raw" isDisabled={!hasRaw}>
+                Raw
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <Tabs.Panel className="min-h-0 flex-1 overflow-auto p-3" id="tree">
+            <PayloadBody event={event} mode="tree" query={query} />
+          </Tabs.Panel>
+          <Tabs.Panel className="min-h-0 flex-1 overflow-auto p-3" id="raw">
+            <PayloadBody event={event} mode="raw" query={query} />
+          </Tabs.Panel>
+        </Tabs>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          <PayloadBody event={event} mode="tree" query={query} />
+        </div>
+      )}
+    </Surface>
   )
 }
 
@@ -173,55 +230,55 @@ function PayloadBody({
   const payload = event.payload
 
   if (!payload) {
-    return <div className="empty empty-small">{event.summary}</div>
+    return <p className="text-sm text-muted">{event.summary}</p>
   }
 
   if (mode === 'raw' && payload.raw !== undefined) {
-    return <pre className="raw">{payload.raw}</pre>
+    return <RawText>{payload.raw}</RawText>
   }
 
   switch (payload.kind) {
-    case 'json':
-      return <JsonTree value={payload.value} query={query.trim().toLowerCase()} />
+    case 'json': {
+      const trimmed = query.trim().toLowerCase()
+      return (
+        <JsonInspector
+          data={payload.value}
+          hideRoot
+          // react-json-tree only consults the predicate when a node first
+          // mounts, so the tree is remounted when the query changes to let a
+          // new search re-open the matching paths.
+          key={trimmed}
+          shouldExpandNodeInitially={expandForQuery(trimmed)}
+        />
+      )
+    }
     case 'string':
-      return <pre className="raw">{String(payload.value)}</pre>
     case 'number':
     case 'boolean':
-      return <pre className="raw">{String(payload.value)}</pre>
+      return <RawText>{String(payload.value)}</RawText>
     case 'binary':
       return (
-        <div className="empty empty-small">
+        <p className="text-sm text-muted">
           Binary payload · {formatBytes(payload.byteLength)}
-        </div>
+        </p>
       )
     case 'null':
-      return <div className="empty empty-small">No payload.</div>
+      return <p className="text-sm text-muted">No payload.</p>
     case 'undecodable':
       return (
-        <div className="empty empty-small">
+        <p className="text-sm text-muted">
           Could not decode payload{payload.note ? `: ${payload.note}` : '.'}
-        </div>
+        </p>
       )
     default:
-      return <div className="empty empty-small">No preview available.</div>
+      return <p className="text-sm text-muted">No preview available.</p>
   }
 }
 
-function Meta({
-  label,
-  value,
-  mono,
-}: {
-  label: string
-  value: string
-  mono?: boolean
-}) {
+function RawText({ children }: { children: string }) {
   return (
-    <div className="meta-item">
-      <dt className="meta-label">{label}</dt>
-      <dd className={`meta-value${mono ? ' meta-mono' : ''}`} title={value}>
-        {value}
-      </dd>
-    </div>
+    <pre className="wrap-anywhere whitespace-pre-wrap rounded-lg bg-surface-tertiary p-3 font-mono text-xs text-foreground">
+      {children}
+    </pre>
   )
 }

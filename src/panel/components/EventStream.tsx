@@ -1,13 +1,17 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
+import { Button, Chip, SearchField, Surface } from '@rozenite/ui'
+import { ArrowDown, ArrowUp, Minus, SearchX } from 'lucide-react'
 
 import type { AblyEvent, EventKind } from '../../shared/types'
 import {
-  directionGlyph,
   eventTone,
   formatBytes,
   formatTime,
   kindLabel,
+  toneChipColor,
+  toneTextClass,
 } from '../format'
+import { LabeledSwitch, WithTooltip } from './primitives'
 
 export const ALL_KINDS: EventKind[] = [
   'message',
@@ -27,7 +31,7 @@ type EventStreamProps = {
   query: string
   onQueryChange: (query: string) => void
   follow: boolean
-  onToggleFollow: () => void
+  onToggleFollow: (next: boolean) => void
   totalCount: number
   droppedCount: number
 }
@@ -35,12 +39,13 @@ type EventStreamProps = {
 /**
  * The event table.
  *
- * Rows are rendered plainly rather than virtualised: retention is already
- * bounded by the device ring buffer, and `content-visibility: auto` in the CSS
- * lets the browser skip layout for off-screen rows. That keeps the component
- * simple and, crucially, keeps text selection and browser find working — both
- * of which windowing libraries break, and both of which matter a lot when the
- * thing you are debugging is a payload.
+ * Rows are a plain table rather than `Table` from `@rozenite/ui`, and are not
+ * virtualised. Retention is already bounded by the device ring buffer, and the
+ * `row-skip-offscreen` utility lets the browser skip layout for off-screen
+ * rows. That keeps text selection and browser find working — both of which
+ * windowing and collection-based tables break, and both of which matter a lot
+ * when the thing you are debugging is a payload. Everything around the table
+ * (filters, search, chrome) uses the shared components.
  */
 export function EventStream({
   events,
@@ -55,7 +60,6 @@ export function EventStream({
   totalCount,
   droppedCount,
 }: EventStreamProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   // Keep the newest row pinned while following. useLayoutEffect avoids the
@@ -71,60 +75,77 @@ export function EventStream({
   }, [follow])
 
   return (
-    <section className="stream">
-      <div className="stream-head">
-        <div className="chips">
+    <section className="flex min-h-0 flex-1 flex-col">
+      <Surface
+        className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2"
+        variant="secondary"
+      >
+        <div className="flex flex-wrap items-center gap-1">
           {ALL_KINDS.map((kind) => (
-            <button
-              type="button"
+            <Button
               key={kind}
-              className={`chip${kinds.has(kind) ? ' chip-on' : ''}`}
-              onClick={() => onToggleKind(kind)}
+              onPress={() => onToggleKind(kind)}
+              size="sm"
+              variant={kinds.has(kind) ? 'secondary' : 'ghost'}
             >
               {kindLabel(kind)}
-            </button>
+            </Button>
           ))}
         </div>
 
-        <input
-          className="input input-grow"
-          placeholder="Search name, channel, payload…"
+        <SearchField
+          aria-label="Search events"
+          className="min-w-48 flex-1"
+          onChange={onQueryChange}
           value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
+        >
+          <SearchField.Group>
+            <SearchField.SearchIcon />
+            <SearchField.Input placeholder="Search name, channel, payload…" />
+            <SearchField.ClearButton />
+          </SearchField.Group>
+        </SearchField>
+
+        <LabeledSwitch
+          hint="Auto-scroll to newest"
+          isSelected={follow}
+          label="Follow"
+          onChange={onToggleFollow}
         />
+      </Surface>
 
-        <label className="checkbox" title="Auto-scroll to newest">
-          <input type="checkbox" checked={follow} onChange={onToggleFollow} />
-          Follow
-        </label>
-      </div>
-
-      <div className="stream-count">
-        {events.length === totalCount
-          ? `${totalCount} events`
-          : `${events.length} of ${totalCount} events`}
+      <div className="flex items-center gap-1 border-b border-border px-3 py-1 text-xs text-muted">
+        <span className="tabular-nums">
+          {events.length === totalCount
+            ? `${totalCount} events`
+            : `${events.length} of ${totalCount} events`}
+        </span>
         {droppedCount > 0 ? (
-          <span
-            className="stream-dropped"
-            title="Older events were discarded because the on-device buffer is full. Raise maxEvents to retain more."
-          >
-            · {droppedCount} dropped
-          </span>
+          <WithTooltip content="Older events were discarded because the on-device buffer is full. Raise maxEvents to retain more.">
+            <span className="tabular-nums text-warning">
+              · {droppedCount} dropped
+            </span>
+          </WithTooltip>
         ) : null}
       </div>
 
-      <div className="stream-body" ref={scrollRef}>
+      <div className="min-h-0 flex-1 overflow-auto">
         {events.length === 0 ? (
-          <div className="empty">No events match the current filters.</div>
+          <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+            <SearchX className="size-5 text-muted" />
+            <span className="text-sm text-muted">
+              No events match the current filters.
+            </span>
+          </div>
         ) : (
-          <table className="table">
+          <table className="w-full border-collapse text-xs">
             <tbody>
               {events.map((event) => (
                 <EventRow
                   key={event.id}
                   event={event}
-                  selected={event.id === selectedId}
                   onSelect={() => onSelect(event)}
+                  selected={event.id === selectedId}
                 />
               ))}
             </tbody>
@@ -134,6 +155,12 @@ export function EventStream({
       </div>
     </section>
   )
+}
+
+function DirectionGlyph({ event }: { event: AblyEvent }) {
+  if (event.dir === 'in') return <ArrowDown className="size-3 text-success" />
+  if (event.dir === 'out') return <ArrowUp className="size-3 text-accent" />
+  return <Minus className="size-3 text-muted" />
 }
 
 function EventRow({
@@ -149,23 +176,36 @@ function EventRow({
 
   return (
     <tr
-      className={`row row-${tone}${selected ? ' row-selected' : ''}`}
+      className={`row-skip-offscreen cursor-pointer border-b border-border/40 transition-colors ${
+        selected ? 'bg-accent/10' : 'hover:bg-surface-secondary/70'
+      }`}
       onClick={onSelect}
     >
-      <td className="cell cell-time">{formatTime(event.ts)}</td>
-      <td className={`cell cell-dir cell-dir-${event.dir}`}>
-        {directionGlyph(event)}
+      <td className="w-24 px-2 py-1 font-mono tabular-nums text-muted">
+        {formatTime(event.ts)}
       </td>
-      <td className="cell cell-kind">
-        <span className={`kind kind-${tone}`}>{kindLabel(event.kind)}</span>
+      <td className="w-6 px-1 py-1">
+        <DirectionGlyph event={event} />
       </td>
-      <td className="cell cell-channel" title={event.channel}>
-        {event.channel ?? <span className="muted">—</span>}
+      <td className="w-20 px-2 py-1">
+        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
+          {kindLabel(event.kind)}
+        </Chip>
       </td>
-      <td className="cell cell-name" title={event.summary}>
-        {event.name ?? <span className="muted">{event.summary}</span>}
+      <td
+        className="max-w-48 truncate px-2 py-1 font-mono text-foreground"
+        title={event.channel}
+      >
+        {event.channel ?? <span className="text-muted">—</span>}
       </td>
-      <td className="cell cell-size">
+      <td className="truncate px-2 py-1" title={event.summary}>
+        {event.name ? (
+          <span className={toneTextClass(tone)}>{event.name}</span>
+        ) : (
+          <span className="text-muted">{event.summary}</span>
+        )}
+      </td>
+      <td className="w-20 px-2 py-1 text-right tabular-nums text-muted">
         {event.payload?.byteLength !== undefined
           ? formatBytes(event.payload.byteLength)
           : ''}

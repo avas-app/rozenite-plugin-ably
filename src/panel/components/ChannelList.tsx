@@ -1,7 +1,17 @@
 import { useMemo, useState } from 'react'
+import {
+  Button,
+  Chip,
+  ListBox,
+  SearchField,
+  Select,
+  Surface,
+} from '@rozenite/ui'
+import { ArrowDown, ArrowUp, Inbox, X } from 'lucide-react'
 
 import type { ChannelAction, ChannelSnapshot } from '../../shared/types'
-import { channelTone, formatDuration } from '../format'
+import { channelTone, formatDuration, toneChipColor } from '../format'
+import { ControlTooltip, LabeledSwitch, StatusDot } from './primitives'
 
 type ChannelListProps = {
   channels: ChannelSnapshot[]
@@ -11,6 +21,12 @@ type ChannelListProps = {
 }
 
 type SortKey = 'activity' | 'name' | 'traffic'
+
+const SORT_OPTIONS: { id: SortKey; label: string }[] = [
+  { id: 'activity', label: 'Recent' },
+  { id: 'traffic', label: 'Traffic' },
+  { id: 'name', label: 'Name' },
+]
 
 /**
  * The channel registry.
@@ -70,61 +86,94 @@ export function ChannelList({
   const hiddenCount = channels.length - visible.length
 
   return (
-    <aside className="channels">
-      <div className="channels-head">
-        <input
-          className="input"
-          placeholder="Filter channels…"
+    <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-surface">
+      <div className="flex flex-col gap-2 border-b border-border px-3 py-2">
+        <SearchField
+          aria-label="Filter channels"
+          onChange={setFilter}
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <div className="channels-controls">
-          <select
-            className="select"
+        >
+          <SearchField.Group>
+            <SearchField.SearchIcon />
+            <SearchField.Input placeholder="Filter channels…" />
+            <SearchField.ClearButton />
+          </SearchField.Group>
+        </SearchField>
+
+        <div className="flex items-center justify-between gap-2">
+          <Select
+            aria-label="Sort channels"
+            className="w-32"
+            onChange={(value) => {
+              if (value != null) setSortKey(String(value) as SortKey)
+            }}
             value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            title="Sort channels"
           >
-            <option value="activity">Recent</option>
-            <option value="traffic">Traffic</option>
-            <option value="name">Name</option>
-          </select>
-          <label className="checkbox" title="Include detached and released channels">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Inactive
-          </label>
+            <Select.Trigger>
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover>
+              <ListBox>
+                {SORT_OPTIONS.map((option) => (
+                  <ListBox.Item
+                    key={option.id}
+                    id={option.id}
+                    textValue={option.label}
+                  >
+                    {option.label}
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
+          </Select>
+
+          <LabeledSwitch
+            hint="Include detached and released channels"
+            isSelected={showInactive}
+            label="Inactive"
+            onChange={setShowInactive}
+          />
         </div>
       </div>
 
       {selected ? (
-        <button type="button" className="channels-clear" onClick={() => onSelect(null)}>
-          ✕ Clear channel filter
-        </button>
+        <Button
+          className="m-2 justify-start"
+          onPress={() => onSelect(null)}
+          size="sm"
+          variant="ghost"
+        >
+          <X className="size-3.5" />
+          Clear channel filter
+        </Button>
       ) : null}
 
-      <div className="channels-list">
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {visible.length === 0 ? (
-          <div className="empty empty-small">
-            {channels.length === 0
-              ? 'No channels yet.'
-              : `No channels match. ${hiddenCount} hidden.`}
+          <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
+            <Inbox className="size-5 text-muted" />
+            <span className="text-sm text-muted">
+              {channels.length === 0
+                ? 'No channels yet.'
+                : `No channels match. ${hiddenCount} hidden.`}
+            </span>
           </div>
         ) : (
-          visible.map((channel) => (
-            <ChannelRow
-              key={channel.name}
-              channel={channel}
-              selected={channel.name === selected}
-              onSelect={() =>
-                onSelect(channel.name === selected ? null : channel.name)
-              }
-              onAction={onAction}
-            />
-          ))
+          <div className="flex flex-col gap-1.5">
+            {visible.map((channel) => (
+              <ChannelRow
+                key={channel.name}
+                channel={channel}
+                onAction={onAction}
+                onSelect={() =>
+                  onSelect(channel.name === selected ? null : channel.name)
+                }
+                selected={channel.name === selected}
+              />
+            ))}
+          </div>
         )}
       </div>
     </aside>
@@ -158,98 +207,110 @@ function ChannelRow({
           ),
         )
 
+  const isAttached = channel.state === 'attached'
+
   return (
-    <div
-      className={`channel${selected ? ' channel-selected' : ''}`}
+    <Surface
+      className={`w-full cursor-pointer rounded-lg border p-2 text-left transition-colors ${
+        selected
+          ? 'border-accent/60 bg-accent/10'
+          : 'border-border/70 hover:bg-surface-secondary/70'
+      }`}
       onClick={onSelect}
-      role="button"
-      tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onSelect()
         }
       }}
+      role="button"
+      tabIndex={0}
+      variant="secondary"
     >
-      <div className="channel-main">
-        <span className={`dot dot-${tone}`} />
-        <span className="channel-name" title={channel.name}>
+      <div className="flex min-w-0 items-center gap-2">
+        <StatusDot tone={tone} />
+        <span
+          className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+          title={channel.name}
+        >
           {channel.name}
         </span>
-        {channel.released ? <span className="tag tag-muted">released</span> : null}
+        {channel.released ? (
+          <Chip color="default" size="sm" variant="soft">
+            released
+          </Chip>
+        ) : null}
       </div>
 
-      <div className="channel-meta">
-        <span className={`channel-state channel-state-${tone}`}>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
           {channel.state}
-        </span>
-        <span className="channel-dim">
+        </Chip>
+        <span className="text-xs text-muted">
           {channel.subscriberCount}{' '}
           {channel.subscriberCount === 1 ? 'listener' : 'listeners'}
         </span>
         {traffic > 0 ? (
-          <span className="channel-dim">
-            ↓{channel.counters.in} ↑{channel.counters.out}
+          <span className="flex items-center gap-1 text-xs tabular-nums text-muted">
+            <ArrowDown className="size-3" />
+            {channel.counters.in}
+            <ArrowUp className="size-3" />
+            {channel.counters.out}
           </span>
         ) : null}
         {channel.counters.errors > 0 ? (
-          <span className="channel-dim channel-dim-bad">
+          <span className="text-xs tabular-nums text-danger">
             {channel.counters.errors} err
           </span>
         ) : null}
       </div>
 
       {labels.length > 0 ? (
-        <div className="channel-labels">
+        <div className="mt-1.5 flex flex-wrap gap-1">
           {labels.map((label) => (
-            <span className="tag" key={label}>
+            <Chip color="accent" key={label} size="sm" variant="soft">
               {label}
-            </span>
+            </Chip>
           ))}
         </div>
       ) : null}
 
       {channel.reason ? (
-        <div className="channel-error" title={channel.reason.message}>
+        <div
+          className="mt-1.5 truncate text-xs text-danger"
+          title={channel.reason.message}
+        >
           {channel.reason.code ? `${channel.reason.code} · ` : ''}
           {channel.reason.message}
         </div>
       ) : null}
 
-      <div className="channel-foot">
-        <span className="channel-dim">
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <span className="truncate text-xs text-muted">
           {channel.lastActivity
             ? `active ${formatDuration(Date.now() - channel.lastActivity)} ago`
             : `${channel.state} ${formatDuration(Date.now() - channel.since)}`}
         </span>
-        <span className="channel-actions">
-          {channel.state === 'attached' ? (
-            <button
-              type="button"
-              className="mini"
-              onClick={(e) => {
-                e.stopPropagation()
-                onAction('detach', channel.name)
-              }}
-              title="Detach this channel"
+        {/*
+          `onPress` gives no DOM event to stop, so the click is swallowed one
+          level up to keep the action from also toggling the row selection.
+        */}
+        <span onClick={(e) => e.stopPropagation()}>
+          <ControlTooltip
+            content={isAttached ? 'Detach this channel' : 'Attach this channel'}
+          >
+            <Button
+              onPress={() =>
+                onAction(isAttached ? 'detach' : 'attach', channel.name)
+              }
+              size="sm"
+              variant="ghost"
             >
-              detach
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="mini"
-              onClick={(e) => {
-                e.stopPropagation()
-                onAction('attach', channel.name)
-              }}
-              title="Attach this channel"
-            >
-              attach
-            </button>
-          )}
+              {isAttached ? 'detach' : 'attach'}
+            </Button>
+          </ControlTooltip>
         </span>
       </div>
-    </div>
+    </Surface>
   )
 }

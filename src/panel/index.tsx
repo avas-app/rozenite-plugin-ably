@@ -1,13 +1,19 @@
 import { useMemo, useState } from 'react'
+import { PluginHeader, PluginTheme, Surface } from '@rozenite/ui'
+import { Loader2, PlugZap } from 'lucide-react'
 
 import type { AblyEvent, EventKind } from '../shared/types'
+import { CaptureControls } from './components/CaptureControls'
 import { ChannelList } from './components/ChannelList'
 import { ConnectionBar } from './components/ConnectionBar'
 import { ALL_KINDS, EventStream } from './components/EventStream'
 import { PayloadViewer } from './components/PayloadViewer'
 import { matches } from './format'
 import { useAblyPanel } from './store'
-import './styles.css'
+import './globals.css'
+
+const SUBTITLE =
+  'Inspect channels, stream live events, and preview decoded payloads.'
 
 export default function AblyPanel() {
   const { state, actions, bridgeReady } = useAblyPanel()
@@ -76,77 +82,129 @@ export default function AblyPanel() {
 
   if (!bridgeReady) {
     return (
-      <div className="app">
-        <div className="empty empty-page">Connecting to React Native…</div>
-      </div>
+      <Shell>
+        <PluginHeader subtitle={SUBTITLE} title="Ably" />
+        <EmptyState
+          icon={<Loader2 className="size-8 animate-spin text-accent" />}
+          message="Connecting to React Native…"
+        />
+      </Shell>
     )
   }
 
   if (!state.hydrated) {
     return (
-      <div className="app">
-        <div className="empty empty-page">
-          <p>Waiting for an instrumented Ably client.</p>
-          <pre className="raw raw-hint">
+      <Shell>
+        <PluginHeader subtitle={SUBTITLE} title="Ably" />
+        <EmptyState
+          icon={<PlugZap className="size-8 text-muted" />}
+          message="Waiting for an instrumented Ably client."
+        >
+          <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-tertiary p-3 text-left font-mono text-xs text-foreground">
             {`import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
 
 useAblyDevTools(ablyRealtimeClient)`}
           </pre>
-        </div>
-      </div>
+        </EmptyState>
+      </Shell>
     )
   }
 
   return (
-    <div className="app">
-      <ConnectionBar
-        connection={state.connection}
-        stats={state.stats}
-        options={state.options}
-        capabilities={state.capabilities}
-        channelCount={state.channels.length}
-        attachedCount={attachedCount}
-        onClear={() => {
-          actions.clear()
-          setSelectedEventId(null)
-        }}
-        onTogglePause={() => actions.setOptions({ paused: !state.options.paused })}
-        onToggleProtocol={() => {
-          const next = !state.options.captureProtocol
-          actions.setOptions({ captureProtocol: next })
-          // Enabling capture with the filter off would look like nothing
-          // happened, so reveal protocol rows at the same time.
-          if (next) {
-            setKinds((prev) => new Set(prev).add('protocol'))
-          }
-        }}
+    <Shell>
+      <PluginHeader
+        actions={
+          <CaptureControls
+            capabilities={state.capabilities}
+            onClear={() => {
+              actions.clear()
+              setSelectedEventId(null)
+            }}
+            onTogglePause={() =>
+              actions.setOptions({ paused: !state.options.paused })
+            }
+            onToggleProtocol={() => {
+              const next = !state.options.captureProtocol
+              actions.setOptions({ captureProtocol: next })
+              // Enabling capture with the filter off would look like nothing
+              // happened, so reveal protocol rows at the same time.
+              if (next) {
+                setKinds((prev) => new Set(prev).add('protocol'))
+              }
+            }}
+            options={state.options}
+          />
+        }
+        subtitle={SUBTITLE}
+        title="Ably"
       />
 
-      <div className="body">
+      <ConnectionBar
+        attachedCount={attachedCount}
+        channelCount={state.channels.length}
+        connection={state.connection}
+        stats={state.stats}
+      />
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <ChannelList
           channels={state.channels}
-          selected={selectedChannel}
-          onSelect={setSelectedChannel}
           onAction={actions.channelAction}
+          onSelect={setSelectedChannel}
+          selected={selectedChannel}
         />
 
-        <main className="main">
+        <main className="flex min-h-0 flex-1 overflow-hidden">
           <EventStream
+            droppedCount={state.stats.dropped}
             events={filteredEvents}
-            selectedId={selectedEventId}
-            onSelect={(event) => setSelectedEventId(event.id)}
+            follow={follow}
             kinds={kinds}
+            onQueryChange={setQuery}
+            onSelect={(event) => setSelectedEventId(event.id)}
+            onToggleFollow={setFollow}
             onToggleKind={toggleKind}
             query={query}
-            onQueryChange={setQuery}
-            follow={follow}
-            onToggleFollow={() => setFollow((f) => !f)}
+            selectedId={selectedEventId}
             totalCount={state.events.length}
-            droppedCount={state.stats.dropped}
           />
           <PayloadViewer event={selectedEvent} query={query} />
         </main>
       </div>
+    </Shell>
+  )
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <PluginTheme
+      className="flex h-screen flex-col bg-background text-foreground"
+      defaultTheme="dark"
+    >
+      {children}
+    </PluginTheme>
+  )
+}
+
+function EmptyState({
+  icon,
+  message,
+  children,
+}: {
+  icon: React.ReactNode
+  message: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+      <Surface
+        className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-border/70 px-6 py-8 text-center shadow-sm"
+        variant="secondary"
+      >
+        {icon}
+        <p className="text-sm font-medium text-foreground">{message}</p>
+        {children}
+      </Surface>
     </div>
   )
 }

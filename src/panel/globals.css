@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@import '@rozenite/ui/styles.css';
+
+/*
+ * Tailwind's automatic source detection skips anything above the stylesheet's
+ * own directory, and this file lives in `src/panel/`. Point it at `src/` so
+ * classes used by the SDK-adjacent panel modules are still collected.
+ */
+@source "../../src";
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+}
+
+@layer utilities {
+  /*
+   * The event stream renders every retained row rather than virtualizing, so
+   * that text selection and browser find keep working on payload text. This
+   * lets the browser skip layout and paint for rows that are scrolled out of
+   * view, which is what makes that affordable. `contain-intrinsic-size` keeps
+   * the scrollbar stable by giving skipped rows a placeholder height.
+   */
+  .row-skip-offscreen {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 24px;
+  }
+}
