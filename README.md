@@ -7,6 +7,8 @@ The Network Activity panel already shows you websocket frames. This shows you
 **Ably**: which channels are attached right now, who is subscribed to them, what
 messages actually arrived, and what was inside them.
 
+![The Ably panel in React Native DevTools: attached channels with labels and counters on the left, a filterable event stream in the middle, and the decoded payload of the selected message on the right.](docs/panel.jpeg)
+
 ## Why
 
 A websocket inspector answers "what bytes moved". Debugging realtime usually

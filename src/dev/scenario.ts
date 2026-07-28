@@ -8,6 +8,10 @@ import { MockClient } from '../testing/fake-ably'
  * app instruments it through the real `useAblyDevTools` hook and the real
  * bridge — nothing about the plugin is stubbed. Only the network is fake, which
  * is what makes the example runnable with no Ably account and no login.
+ *
+ * The domain here is deliberately generic device telemetry. It exists to
+ * exercise payload shapes — nested objects, scalars, oversized bodies — not to
+ * resemble any particular product.
  */
 
 export const SESSION_CHANNEL = 'session_1d84-6e05-b273'
@@ -46,8 +50,8 @@ function readingPayload() {
   return JSON.stringify({
     event: 'SENSOR_READING',
     payload: {
-      temperature_c: 18 + random() * 12,
-      humidity_pct: 35 + random() * 40,
+      temperature_c: Math.round((18 + random() * 12) * 10) / 10,
+      humidity_pct: Math.round(35 + random() * 40),
       pressure_hpa: Math.round(995 + random() * 25),
       battery_pct: Math.round(random() * 100),
     },
@@ -115,8 +119,8 @@ export function connectScenario(client: MockClient): void {
 }
 
 /**
- * Starts the continuous background traffic (sensor readings and chat). Returns a
- * stop function.
+ * Starts the continuous background traffic (sensor readings and chat). Returns
+ * a stop function.
  */
 export function startTraffic(client: MockClient): () => void {
   const readings = setInterval(() => {
