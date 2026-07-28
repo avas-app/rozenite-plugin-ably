@@ -1,7 +1,7 @@
 {
   "name": "@avasapp/rozenite-plugin-ably",
-  "version": "0.1.0",
-  "description": "Ably Realtime inspector for React Native DevTools — inspect channels, stream live events, and preview decoded payloads.",
+  "version": "0.1.1",
+  "description": "Ably Realtime inspector for React Native DevTools \u2014 inspect channels, stream live events, and preview decoded payloads.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/avas-app/rozenite-plugin-ably#readme",
