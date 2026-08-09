@@ -111,8 +111,8 @@ searches payload contents too.
 
 **Payloads** — Ably delivers most payloads as a JSON *string*. The plugin parses
 it and keeps the original, so you get a real collapsible tree by default and the
-exact bytes on demand. Search highlights matches and auto-expands the path to
-them.
+exact bytes on demand. Searching expands the tree far enough to reveal matches
+rather than filtering them out of their surrounding structure.
 
 ## Design notes
 
@@ -168,19 +168,6 @@ Two wiring details worth knowing if you adapt this setup:
 - Metro resolves the bare specifier to the plugin's TypeScript **source**, so SDK
   edits hot reload. Panel edits still need `bun run build` in the root, because
   the panel is served from `dist/`.
-
-## Panel UI
-
-The panel is built on [`@rozenite/ui`](https://github.com/callstackincubator/rozenite/tree/main/packages/ui),
-the shared HeroUI + Tailwind design system the official Rozenite plugins use, so
-it matches the rest of the DevTools chrome and follows the DevTools light/dark
-theme (including the per-panel theme switcher in the header).
-
-Styling comes from `src/panel/globals.css`, which pulls in Tailwind and
-`@rozenite/ui/styles.css`; there is no plugin-specific stylesheet. The one place
-this panel deliberately does not use a shared component is the event table —
-it stays a plain table so that text selection and browser find keep working on
-payload text, which collection-based and virtualised tables break.
 
 ## Development
 
