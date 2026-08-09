@@ -1,17 +1,15 @@
 import { useMemo, useState } from 'react'
-import {
-  Button,
-  Chip,
-  ListBox,
-  SearchField,
-  Select,
-  Surface,
-} from '@rozenite/ui'
+import { Badge, Button, SearchField, Select } from '@rozenite/ui'
 import { ArrowDown, ArrowUp, Inbox, X } from 'lucide-react'
 
 import type { ChannelAction, ChannelSnapshot } from '../../shared/types'
-import { channelTone, formatDuration, toneChipColor } from '../format'
-import { ControlTooltip, LabeledSwitch, StatusDot } from './primitives'
+import { channelTone, formatDuration } from '../format'
+import {
+  ControlTooltip,
+  LabeledSwitch,
+  StatusDot,
+  ToneBadge,
+} from './primitives'
 
 type ChannelListProps = {
   channels: ChannelSnapshot[]
@@ -22,11 +20,13 @@ type ChannelListProps = {
 
 type SortKey = 'activity' | 'name' | 'traffic'
 
-const SORT_OPTIONS: { id: SortKey; label: string }[] = [
-  { id: 'activity', label: 'Recent' },
-  { id: 'traffic', label: 'Traffic' },
-  { id: 'name', label: 'Name' },
-]
+const SORT_LABELS: Record<SortKey, string> = {
+  activity: 'Recent',
+  traffic: 'Traffic',
+  name: 'Name',
+}
+
+const SORT_KEYS = Object.keys(SORT_LABELS) as SortKey[]
 
 /**
  * The channel registry.
@@ -86,47 +86,35 @@ export function ChannelList({
   const hiddenCount = channels.length - visible.length
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="flex w-72 shrink-0 flex-col border-r border-border bg-sidebar">
       <div className="flex flex-col gap-2 border-b border-border px-3 py-2">
         <SearchField
           aria-label="Filter channels"
-          onChange={setFilter}
+          onChange={(event) => setFilter(event.target.value)}
+          onClear={() => setFilter('')}
+          placeholder="Filter channels…"
           value={filter}
-        >
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Filter channels…" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
+        />
 
         <div className="flex items-center justify-between gap-2">
           <Select
-            aria-label="Sort channels"
-            className="w-32"
-            onChange={(value) => {
-              if (value != null) setSortKey(String(value) as SortKey)
+            onValueChange={(value) => {
+              if (value != null) setSortKey(value)
             }}
             value={sortKey}
           >
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
+            <Select.Trigger aria-label="Sort channels" className="w-32">
+              <Select.Value>
+                {(value: SortKey) => SORT_LABELS[value]}
+              </Select.Value>
             </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {SORT_OPTIONS.map((option) => (
-                  <ListBox.Item
-                    key={option.id}
-                    id={option.id}
-                    textValue={option.label}
-                  >
-                    {option.label}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
+            <Select.Content>
+              {SORT_KEYS.map((key) => (
+                <Select.Item key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </Select.Item>
+              ))}
+            </Select.Content>
           </Select>
 
           <LabeledSwitch
@@ -141,11 +129,11 @@ export function ChannelList({
       {selected ? (
         <Button
           className="m-2 justify-start"
-          onPress={() => onSelect(null)}
-          size="sm"
+          onClick={() => onSelect(null)}
+          size="compact"
           variant="ghost"
         >
-          <X className="size-3.5" />
+          <X />
           Clear channel filter
         </Button>
       ) : null}
@@ -153,8 +141,8 @@ export function ChannelList({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {visible.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
-            <Inbox className="size-5 text-muted" />
-            <span className="text-sm text-muted">
+            <Inbox className="size-5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
               {channels.length === 0
                 ? 'No channels yet.'
                 : `No channels match. ${hiddenCount} hidden.`}
@@ -210,11 +198,11 @@ function ChannelRow({
   const isAttached = channel.state === 'attached'
 
   return (
-    <Surface
-      className={`w-full cursor-pointer rounded-lg border p-2 text-left transition-colors ${
+    <div
+      className={`w-full cursor-pointer rounded-md border p-2 text-left transition-colors ${
         selected
-          ? 'border-accent/60 bg-accent/10'
-          : 'border-border/70 hover:bg-surface-secondary/70'
+          ? 'border-primary/60 bg-accent'
+          : 'border-border/70 bg-card hover:bg-accent/50'
       }`}
       onClick={onSelect}
       onKeyDown={(e) => {
@@ -225,7 +213,6 @@ function ChannelRow({
       }}
       role="button"
       tabIndex={0}
-      variant="secondary"
     >
       <div className="flex min-w-0 items-center gap-2">
         <StatusDot tone={tone} />
@@ -235,23 +222,17 @@ function ChannelRow({
         >
           {channel.name}
         </span>
-        {channel.released ? (
-          <Chip color="default" size="sm" variant="soft">
-            released
-          </Chip>
-        ) : null}
+        {channel.released ? <Badge variant="outline">released</Badge> : null}
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
-          {channel.state}
-        </Chip>
-        <span className="text-xs text-muted">
+        <ToneBadge tone={tone}>{channel.state}</ToneBadge>
+        <span className="text-xs text-muted-foreground">
           {channel.subscriberCount}{' '}
           {channel.subscriberCount === 1 ? 'listener' : 'listeners'}
         </span>
         {traffic > 0 ? (
-          <span className="flex items-center gap-1 text-xs tabular-nums text-muted">
+          <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
             <ArrowDown className="size-3" />
             {channel.counters.in}
             <ArrowUp className="size-3" />
@@ -268,9 +249,13 @@ function ChannelRow({
       {labels.length > 0 ? (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {labels.map((label) => (
-            <Chip color="accent" key={label} size="sm" variant="soft">
+            <Badge
+              className="bg-primary/15 text-primary"
+              key={label}
+              variant="secondary"
+            >
               {label}
-            </Chip>
+            </Badge>
           ))}
         </div>
       ) : null}
@@ -286,24 +271,21 @@ function ChannelRow({
       ) : null}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span className="truncate text-xs text-muted">
+        <span className="truncate text-xs text-muted-foreground">
           {channel.lastActivity
             ? `active ${formatDuration(Date.now() - channel.lastActivity)} ago`
             : `${channel.state} ${formatDuration(Date.now() - channel.since)}`}
         </span>
-        {/*
-          `onPress` gives no DOM event to stop, so the click is swallowed one
-          level up to keep the action from also toggling the row selection.
-        */}
+        {/* Swallow the click so the action does not also toggle row selection. */}
         <span onClick={(e) => e.stopPropagation()}>
           <ControlTooltip
             content={isAttached ? 'Detach this channel' : 'Attach this channel'}
           >
             <Button
-              onPress={() =>
+              onClick={() =>
                 onAction(isAttached ? 'detach' : 'attach', channel.name)
               }
-              size="sm"
+              size="compact"
               variant="ghost"
             >
               {isAttached ? 'detach' : 'attach'}
@@ -311,6 +293,6 @@ function ChannelRow({
           </ControlTooltip>
         </span>
       </div>
-    </Surface>
+    </div>
   )
 }

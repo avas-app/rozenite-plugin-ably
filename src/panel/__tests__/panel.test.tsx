@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test'
 import { renderToString } from 'react-dom/server'
-import { PluginTheme } from '@rozenite/ui'
+import { PluginShell, Tooltip } from '@rozenite/ui'
 
 import type {
   AblyEvent,
@@ -18,15 +18,21 @@ import { PayloadViewer } from '../components/PayloadViewer'
  * Render smoke tests for the panel.
  *
  * These exist because the panel is assembled from `@rozenite/ui`, whose
- * components are *composed* — `Tabs.Indicator` has to sit inside a `Tabs.Tab`,
- * `Switch` needs a Content/Control/Thumb triplet, `Select` needs a `ListBox`.
+ * components are *composed* — `Select.Value` has to sit inside a
+ * `Select.Trigger`, `Tooltip.Content` inside a `Tooltip`, and several hooks
+ * (`usePluginTheme`, the portal container) throw outside a `PluginShell`.
  * Getting one of those wrong type-checks cleanly and then throws at render, so
  * the whole surface is rendered once here. This is the cheapest thing that
- * catches a `@rozenite/ui` upgrade changing a composition contract.
+ * catches a `@rozenite/ui` upgrade changing a composition contract — as the v2
+ * upgrade did, to nearly every component below.
  */
 
 const render = (node: React.ReactNode) =>
-  renderToString(<PluginTheme>{node}</PluginTheme>)
+  renderToString(
+    <PluginShell>
+      <Tooltip.Provider>{node}</Tooltip.Provider>
+    </PluginShell>,
+  )
 
 const connection: ConnectionSnapshot = {
   state: 'failed',
@@ -253,7 +259,7 @@ test('PayloadViewer renders the no-selection state', () => {
   expect(html).toContain('Select an event to inspect its payload.')
 })
 
-// The panel shell pulls in `globals.css`, `PluginTheme` and `PluginHeader`, so
+// The panel shell pulls in `globals.css`, `PluginShell` and `PluginHeader`, so
 // it is rendered through its real entry point rather than piecemeal.
 mock.module('@rozenite/plugin-bridge', () => ({
   useRozeniteDevToolsClient: () => null,
@@ -265,5 +271,5 @@ test('AblyPanel renders the shell while the bridge is connecting', async () => {
   expect(html).toContain('Connecting to React Native')
   expect(html).toContain('Ably')
   // PluginHeader's theme switcher — confirms the shared header is mounted.
-  expect(html).toContain('Theme switcher')
+  expect(html).toContain('plugin-header-theme-switcher')
 })

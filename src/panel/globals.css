@@ -8,6 +8,34 @@
  */
 @source "../../src";
 
+/*
+ * Status colours.
+ *
+ * `@rozenite/ui`'s palette is deliberately small — one brand colour plus
+ * `destructive` — because most panels only ever signal "bad". A realtime
+ * inspector has to distinguish healthy / degraded / failed at a glance, so the
+ * three tones it needs beyond the shared set are defined here rather than
+ * borrowed from tokens that mean something else. See `toneBadgeClass` in
+ * `format.ts` for how they are applied.
+ */
+@theme inline {
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+}
+
+:root {
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #c0392b;
+}
+
+.dark {
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #fa7171;
+}
+
 @layer base {
   html,
   body,

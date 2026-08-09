@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  Button,
-  Chip,
-  JsonInspector,
-  Surface,
-  Tabs,
-  useCopyToClipboard,
-} from '@rozenite/ui'
+import { Button, JsonInspector, Tabs, useCopyToClipboard } from '@rozenite/ui'
 import {
   AlertTriangle,
   Check,
@@ -16,9 +9,9 @@ import {
 } from 'lucide-react'
 
 import type { AblyEvent } from '../../shared/types'
-import { eventTone, formatBytes, formatTime, toneChipColor } from '../format'
-import { expandForQuery } from '../json-search'
-import { MetaItem } from './primitives'
+import { eventTone, formatBytes, formatTime } from '../format'
+import { expandDepthForQuery } from '../json-search'
+import { MetaItem, ToneBadge } from './primitives'
 
 type PayloadViewerProps = {
   event: AblyEvent | null
@@ -38,7 +31,7 @@ type Mode = 'tree' | 'raw'
  */
 export function PayloadViewer({ event, query }: PayloadViewerProps) {
   const [mode, setMode] = useState<Mode>('tree')
-  const { copy, isCopied } = useCopyToClipboard(1400)
+  const { copy, copied } = useCopyToClipboard({ resetDelay: 1400 })
 
   const payload = event?.payload
   const hasRaw = typeof payload?.raw === 'string'
@@ -52,15 +45,12 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
 
   if (!event) {
     return (
-      <Surface
-        className="flex w-1/2 shrink-0 flex-col items-center justify-center gap-2 border-l border-border px-4 text-center"
-        variant="secondary"
-      >
-        <MousePointerClick className="size-5 text-muted" />
-        <span className="text-sm text-muted">
+      <div className="flex w-1/2 shrink-0 flex-col items-center justify-center gap-2 border-l border-border bg-card px-4 text-center">
+        <MousePointerClick className="size-5 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">
           Select an event to inspect its payload.
         </span>
-      </Surface>
+      </div>
     )
   }
 
@@ -80,17 +70,14 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
   const tone = eventTone(event)
 
   return (
-    <Surface
-      className="flex w-1/2 shrink-0 flex-col border-l border-border"
-      variant="secondary"
-    >
+    <div className="flex w-1/2 shrink-0 flex-col border-l border-border bg-card">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="truncate text-sm font-semibold text-foreground">
             {event.name ?? event.summary}
           </span>
           {event.channel ? (
-            <code className="truncate rounded bg-surface-tertiary px-1.5 py-0.5 font-mono text-xs text-muted">
+            <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
               {event.channel}
             </code>
           ) : null}
@@ -98,18 +85,14 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
 
         {payload ? (
           <Button
-            onPress={() => {
+            onClick={() => {
               void copy(copyText()).catch(() => {})
             }}
-            size="sm"
+            size="compact"
             variant="ghost"
           >
-            {isCopied ? (
-              <Check className="size-4 text-success" />
-            ) : (
-              <Copy className="size-4" />
-            )}
-            {isCopied ? 'Copied' : 'Copy'}
+            {copied ? <Check className="text-success" /> : <Copy />}
+            {copied ? 'Copied' : 'Copy'}
           </Button>
         ) : null}
       </div>
@@ -120,9 +103,7 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
           <MetaItem label="server">{formatTime(event.timestamp)}</MetaItem>
         ) : null}
         <MetaItem label="kind">
-          <Chip color={toneChipColor(tone)} size="sm" variant="soft">
-            {event.kind}
-          </Chip>
+          <ToneBadge tone={tone}>{event.kind}</ToneBadge>
         </MetaItem>
         <MetaItem label="dir">{event.dir}</MetaItem>
         {event.messageId ? (
@@ -182,30 +163,25 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
 
       {isStructured || hasRaw ? (
         <Tabs
-          className="min-h-0 flex-1"
-          onSelectionChange={(key) => setMode(String(key) as Mode)}
-          selectedKey={mode}
+          className="flex min-h-0 flex-1 flex-col"
+          onValueChange={(value) => setMode(value as Mode)}
+          value={mode}
         >
-          <Tabs.ListContainer className="px-3 pt-2">
-            {/*
-              `Tabs.Indicator` reads the per-tab selection context, so it goes
-              inside each tab rather than alongside them.
-            */}
-            <Tabs.List aria-label="Payload view">
-              <Tabs.Tab id="tree" isDisabled={!isStructured}>
-                Tree
-                <Tabs.Indicator />
-              </Tabs.Tab>
-              <Tabs.Tab id="raw" isDisabled={!hasRaw}>
-                Raw
-                <Tabs.Indicator />
-              </Tabs.Tab>
-            </Tabs.List>
-          </Tabs.ListContainer>
-          <Tabs.Panel className="min-h-0 flex-1 overflow-auto p-3" id="tree">
+          <Tabs.List aria-label="Payload view" className="mx-3 mt-2 self-start">
+            <Tabs.Tab disabled={!isStructured} value="tree">
+              Tree
+            </Tabs.Tab>
+            <Tabs.Tab disabled={!hasRaw} value="raw">
+              Raw
+            </Tabs.Tab>
+          </Tabs.List>
+          <Tabs.Panel
+            className="min-h-0 flex-1 overflow-auto p-3"
+            value="tree"
+          >
             <PayloadBody event={event} mode="tree" query={query} />
           </Tabs.Panel>
-          <Tabs.Panel className="min-h-0 flex-1 overflow-auto p-3" id="raw">
+          <Tabs.Panel className="min-h-0 flex-1 overflow-auto p-3" value="raw">
             <PayloadBody event={event} mode="raw" query={query} />
           </Tabs.Panel>
         </Tabs>
@@ -214,7 +190,7 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
           <PayloadBody event={event} mode="tree" query={query} />
         </div>
       )}
-    </Surface>
+    </div>
   )
 }
 
@@ -230,7 +206,7 @@ function PayloadBody({
   const payload = event.payload
 
   if (!payload) {
-    return <p className="text-sm text-muted">{event.summary}</p>
+    return <p className="text-sm text-muted-foreground">{event.summary}</p>
   }
 
   if (mode === 'raw' && payload.raw !== undefined) {
@@ -243,12 +219,11 @@ function PayloadBody({
       return (
         <JsonInspector
           data={payload.value}
-          hideRoot
-          // react-json-tree only consults the predicate when a node first
-          // mounts, so the tree is remounted when the query changes to let a
-          // new search re-open the matching paths.
+          defaultExpandedDepth={expandDepthForQuery(payload.value, trimmed)}
+          // Each node reads the expansion depth once, on mount, so the tree is
+          // remounted when the query changes to let a new search re-open the
+          // matching paths.
           key={trimmed}
-          shouldExpandNodeInitially={expandForQuery(trimmed)}
         />
       )
     }
@@ -258,26 +233,28 @@ function PayloadBody({
       return <RawText>{String(payload.value)}</RawText>
     case 'binary':
       return (
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Binary payload · {formatBytes(payload.byteLength)}
         </p>
       )
     case 'null':
-      return <p className="text-sm text-muted">No payload.</p>
+      return <p className="text-sm text-muted-foreground">No payload.</p>
     case 'undecodable':
       return (
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Could not decode payload{payload.note ? `: ${payload.note}` : '.'}
         </p>
       )
     default:
-      return <p className="text-sm text-muted">No preview available.</p>
+      return (
+        <p className="text-sm text-muted-foreground">No preview available.</p>
+      )
   }
 }
 
 function RawText({ children }: { children: string }) {
   return (
-    <pre className="wrap-anywhere whitespace-pre-wrap rounded-lg bg-surface-tertiary p-3 font-mono text-xs text-foreground">
+    <pre className="wrap-anywhere whitespace-pre-wrap rounded-md bg-muted p-3 font-mono text-xs text-foreground">
       {children}
     </pre>
   )

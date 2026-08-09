@@ -1,9 +1,8 @@
-import { Chip, Separator, Surface } from '@rozenite/ui'
 import { AlertTriangle } from 'lucide-react'
 
 import type { ConnectionSnapshot, SessionStats } from '../../shared/types'
-import { connectionTone, formatDuration, toneChipColor } from '../format'
-import { MetaItem, WithTooltip } from './primitives'
+import { connectionTone, formatDuration } from '../format'
+import { MetaItem, ToneBadge, VerticalRule, WithTooltip } from './primitives'
 
 type ConnectionBarProps = {
   connection: ConnectionSnapshot
@@ -30,20 +29,17 @@ export function ConnectionBar({
   const elapsed = formatDuration(Date.now() - connection.since)
 
   return (
-    <Surface
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-2"
-      variant="secondary"
-    >
+    <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-card px-4 py-2">
       <div className="flex items-center gap-2">
-        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
-          {connection.state}
-        </Chip>
+        <ToneBadge tone={tone}>{connection.state}</ToneBadge>
         <WithTooltip content="Time in current state">
-          <span className="text-xs tabular-nums text-muted">{elapsed}</span>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {elapsed}
+          </span>
         </WithTooltip>
       </div>
 
-      <Separator className="h-4" orientation="vertical" />
+      <VerticalRule />
 
       {connection.id ? (
         <MetaItem label="id" mono>
@@ -59,7 +55,7 @@ export function ConnectionBar({
 
       <MetaItem label="channels">
         <span className="tabular-nums">{attachedCount}</span>
-        <span className="text-muted"> / {channelCount}</span>
+        <span className="text-muted-foreground"> / {channelCount}</span>
       </MetaItem>
 
       <MetaItem label="in">
@@ -81,12 +77,14 @@ export function ConnectionBar({
           <AlertTriangle className="size-3.5 shrink-0" />
           <span className="truncate" title={connection.reason.message}>
             {connection.reason.code ? (
-              <strong className="font-semibold">{connection.reason.code} </strong>
+              <strong className="font-semibold">
+                {connection.reason.code}{' '}
+              </strong>
             ) : null}
             {connection.reason.message}
           </span>
         </div>
       ) : null}
-    </Surface>
+    </div>
   )
 }

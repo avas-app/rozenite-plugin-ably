@@ -10,7 +10,7 @@
     "android": "expo run:android"
   },
   "dependencies": {
-    "@rozenite/metro": "^1.13.0",
+    "@rozenite/metro": "^2.0.0",
     "expo": "~54.0.0",
     "expo-status-bar": "~3.0.0",
     "react": "19.1.0",

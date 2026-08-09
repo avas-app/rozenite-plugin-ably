@@ -50,11 +50,11 @@
     "prepublishOnly": "tsc -p tsconfig.json --noEmit && rozenite build"
   },
   "dependencies": {
-    "@rozenite/plugin-bridge": "^1.13.0"
+    "@rozenite/plugin-bridge": "^2.0.0"
   },
   "devDependencies": {
-    "@rozenite/ui": "^1.14.0",
-    "@rozenite/vite-plugin": "^1.13.0",
+    "@rozenite/ui": "^2.0.0",
+    "@rozenite/vite-plugin": "^2.0.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/bun": "^1.3.14",
     "@types/react": "~19.2.2",
@@ -65,7 +65,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.1",
     "react-native-web": "^0.21.2",
-    "rozenite": "^1.13.0",
+    "rozenite": "^2.0.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "vite": "^7.3.1"

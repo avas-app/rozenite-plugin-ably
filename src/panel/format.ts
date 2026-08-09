@@ -37,31 +37,36 @@ export function formatBytes(bytes?: number): string {
  */
 export type Tone = 'good' | 'warn' | 'bad' | 'idle' | 'busy'
 
-/** `Chip`'s colour scale, mapped from our semantic tones. */
-export type ChipColor = 'success' | 'warning' | 'danger' | 'default' | 'accent'
-
-const TONE_CHIP_COLOR: Record<Tone, ChipColor> = {
-  good: 'success',
-  warn: 'warning',
-  bad: 'danger',
-  idle: 'default',
-  busy: 'accent',
+/**
+ * Soft `Badge` styling for a tone.
+ *
+ * `Badge` ships three variants (default/secondary/outline) and no colour scale,
+ * so tone is carried by classes layered over `secondary`. The tokens come from
+ * `globals.css`; `busy` reuses the shared brand colour rather than inventing a
+ * fourth.
+ */
+const TONE_BADGE_CLASS: Record<Tone, string> = {
+  good: 'bg-success/15 text-success',
+  warn: 'bg-warning/15 text-warning',
+  bad: 'bg-danger/15 text-danger',
+  idle: 'bg-muted text-muted-foreground',
+  busy: 'bg-primary/15 text-primary',
 }
 
-export function toneChipColor(tone: Tone): ChipColor {
-  return TONE_CHIP_COLOR[tone]
+export function toneBadgeClass(tone: Tone): string {
+  return TONE_BADGE_CLASS[tone]
 }
 
 /**
- * Tailwind text colour for a tone, for the places a full `Chip` would be too
+ * Tailwind text colour for a tone, for the places a full `Badge` would be too
  * heavy — status dots and dense table cells.
  */
 const TONE_TEXT_CLASS: Record<Tone, string> = {
   good: 'text-success',
   warn: 'text-warning',
   bad: 'text-danger',
-  idle: 'text-muted',
-  busy: 'text-accent',
+  idle: 'text-muted-foreground',
+  busy: 'text-primary',
 }
 
 export function toneTextClass(tone: Tone): string {

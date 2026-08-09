@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { Button, Chip, SearchField, Surface } from '@rozenite/ui'
+import { Button, SearchField } from '@rozenite/ui'
 import { ArrowDown, ArrowUp, Minus, SearchX } from 'lucide-react'
 
 import type { AblyEvent, EventKind } from '../../shared/types'
@@ -8,10 +8,9 @@ import {
   formatBytes,
   formatTime,
   kindLabel,
-  toneChipColor,
   toneTextClass,
 } from '../format'
-import { LabeledSwitch, WithTooltip } from './primitives'
+import { LabeledSwitch, ToneBadge, WithTooltip } from './primitives'
 
 export const ALL_KINDS: EventKind[] = [
   'message',
@@ -39,13 +38,13 @@ type EventStreamProps = {
 /**
  * The event table.
  *
- * Rows are a plain table rather than `Table` from `@rozenite/ui`, and are not
- * virtualised. Retention is already bounded by the device ring buffer, and the
- * `row-skip-offscreen` utility lets the browser skip layout for off-screen
+ * Rows are a plain table rather than `VirtualizedDataTable` from
+ * `@rozenite/ui`. Retention is already bounded by the device ring buffer, and
+ * the `row-skip-offscreen` utility lets the browser skip layout for off-screen
  * rows. That keeps text selection and browser find working — both of which
- * windowing and collection-based tables break, and both of which matter a lot
- * when the thing you are debugging is a payload. Everything around the table
- * (filters, search, chrome) uses the shared components.
+ * windowing breaks, and both of which matter a lot when the thing you are
+ * debugging is a payload. Everything around the table (filters, search,
+ * chrome) uses the shared components.
  */
 export function EventStream({
   events,
@@ -76,16 +75,13 @@ export function EventStream({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <Surface
-        className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2"
-        variant="secondary"
-      >
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {ALL_KINDS.map((kind) => (
             <Button
               key={kind}
-              onPress={() => onToggleKind(kind)}
-              size="sm"
+              onClick={() => onToggleKind(kind)}
+              size="compact"
               variant={kinds.has(kind) ? 'secondary' : 'ghost'}
             >
               {kindLabel(kind)}
@@ -93,18 +89,17 @@ export function EventStream({
           ))}
         </div>
 
-        <SearchField
-          aria-label="Search events"
-          className="min-w-48 flex-1"
-          onChange={onQueryChange}
-          value={query}
-        >
-          <SearchField.Group>
-            <SearchField.SearchIcon />
-            <SearchField.Input placeholder="Search name, channel, payload…" />
-            <SearchField.ClearButton />
-          </SearchField.Group>
-        </SearchField>
+        {/* `SearchField` puts `className` on the input, so the growth has to
+            go on a wrapper for the field to fill the row. */}
+        <div className="min-w-48 flex-1">
+          <SearchField
+            aria-label="Search events"
+            onChange={(event) => onQueryChange(event.target.value)}
+            onClear={() => onQueryChange('')}
+            placeholder="Search name, channel, payload…"
+            value={query}
+          />
+        </div>
 
         <LabeledSwitch
           hint="Auto-scroll to newest"
@@ -112,9 +107,9 @@ export function EventStream({
           label="Follow"
           onChange={onToggleFollow}
         />
-      </Surface>
+      </div>
 
-      <div className="flex items-center gap-1 border-b border-border px-3 py-1 text-xs text-muted">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-1 text-xs text-muted-foreground">
         <span className="tabular-nums">
           {events.length === totalCount
             ? `${totalCount} events`
@@ -132,8 +127,8 @@ export function EventStream({
       <div className="min-h-0 flex-1 overflow-auto">
         {events.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
-            <SearchX className="size-5 text-muted" />
-            <span className="text-sm text-muted">
+            <SearchX className="size-5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
               No events match the current filters.
             </span>
           </div>
@@ -159,8 +154,8 @@ export function EventStream({
 
 function DirectionGlyph({ event }: { event: AblyEvent }) {
   if (event.dir === 'in') return <ArrowDown className="size-3 text-success" />
-  if (event.dir === 'out') return <ArrowUp className="size-3 text-accent" />
-  return <Minus className="size-3 text-muted" />
+  if (event.dir === 'out') return <ArrowUp className="size-3 text-primary" />
+  return <Minus className="size-3 text-muted-foreground" />
 }
 
 function EventRow({
@@ -177,35 +172,33 @@ function EventRow({
   return (
     <tr
       className={`row-skip-offscreen cursor-pointer border-b border-border/40 transition-colors ${
-        selected ? 'bg-accent/10' : 'hover:bg-surface-secondary/70'
+        selected ? 'bg-accent' : 'hover:bg-accent/50'
       }`}
       onClick={onSelect}
     >
-      <td className="w-24 px-2 py-1 font-mono tabular-nums text-muted">
+      <td className="w-24 px-2 py-1 font-mono tabular-nums text-muted-foreground">
         {formatTime(event.ts)}
       </td>
       <td className="w-6 px-1 py-1">
         <DirectionGlyph event={event} />
       </td>
       <td className="w-20 px-2 py-1">
-        <Chip color={toneChipColor(tone)} size="sm" variant="soft">
-          {kindLabel(event.kind)}
-        </Chip>
+        <ToneBadge tone={tone}>{kindLabel(event.kind)}</ToneBadge>
       </td>
       <td
         className="max-w-48 truncate px-2 py-1 font-mono text-foreground"
         title={event.channel}
       >
-        {event.channel ?? <span className="text-muted">—</span>}
+        {event.channel ?? <span className="text-muted-foreground">—</span>}
       </td>
       <td className="truncate px-2 py-1" title={event.summary}>
         {event.name ? (
           <span className={toneTextClass(tone)}>{event.name}</span>
         ) : (
-          <span className="text-muted">{event.summary}</span>
+          <span className="text-muted-foreground">{event.summary}</span>
         )}
       </td>
-      <td className="w-20 px-2 py-1 text-right tabular-nums text-muted">
+      <td className="w-20 px-2 py-1 text-right tabular-nums text-muted-foreground">
         {event.payload?.byteLength !== undefined
           ? formatBytes(event.payload.byteLength)
           : ''}

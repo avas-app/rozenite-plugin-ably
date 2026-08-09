@@ -25,17 +25,15 @@ export function CaptureControls({
 }: CaptureControlsProps) {
   return (
     <>
-      <ControlTooltip content={options.paused ? 'Resume capture' : 'Pause capture'}>
+      <ControlTooltip
+        content={options.paused ? 'Resume capture' : 'Pause capture'}
+      >
         <Button
-          onPress={onTogglePause}
-          size="sm"
-          variant={options.paused ? 'primary' : 'ghost'}
+          onClick={onTogglePause}
+          size="compact"
+          variant={options.paused ? 'default' : 'ghost'}
         >
-          {options.paused ? (
-            <Play className="size-4" />
-          ) : (
-            <Pause className="size-4" />
-          )}
+          {options.paused ? <Play /> : <Pause />}
           {options.paused ? 'Resume' : 'Pause'}
         </Button>
       </ControlTooltip>
@@ -48,19 +46,26 @@ export function CaptureControls({
         }
       >
         <Button
-          isDisabled={!capabilities.protocol}
-          onPress={onToggleProtocol}
-          size="sm"
+          disabled={!capabilities.protocol}
+          onClick={onToggleProtocol}
+          size="compact"
           variant={options.captureProtocol ? 'secondary' : 'ghost'}
         >
-          <Radio className="size-4" />
+          <Radio />
           Protocol
         </Button>
       </ControlTooltip>
 
       <ControlTooltip content="Clear captured events">
-        <Button aria-label="Clear" isIconOnly onPress={onClear} size="sm" variant="ghost">
-          <Trash2 className="size-4" />
+        {/* `size="icon"` is a full-height square; this row is `compact`. */}
+        <Button
+          aria-label="Clear"
+          className="w-6 px-0"
+          onClick={onClear}
+          size="compact"
+          variant="ghost"
+        >
+          <Trash2 />
         </Button>
       </ControlTooltip>
     </>

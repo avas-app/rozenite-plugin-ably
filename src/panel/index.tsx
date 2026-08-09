@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { PluginHeader, PluginTheme, Surface } from '@rozenite/ui'
+import { EmptyState, PluginHeader, PluginShell, Tooltip } from '@rozenite/ui'
 import { Loader2, PlugZap } from 'lucide-react'
 
 import type { AblyEvent, EventKind } from '../shared/types'
@@ -83,10 +83,10 @@ export default function AblyPanel() {
   if (!bridgeReady) {
     return (
       <Shell>
-        <PluginHeader subtitle={SUBTITLE} title="Ably" />
+        <Header />
         <EmptyState
-          icon={<Loader2 className="size-8 animate-spin text-accent" />}
-          message="Connecting to React Native…"
+          icon={ConnectingSpinner}
+          title="Connecting to React Native…"
         />
       </Shell>
     )
@@ -95,49 +95,46 @@ export default function AblyPanel() {
   if (!state.hydrated) {
     return (
       <Shell>
-        <PluginHeader subtitle={SUBTITLE} title="Ably" />
+        <Header />
         <EmptyState
-          icon={<PlugZap className="size-8 text-muted" />}
-          message="Waiting for an instrumented Ably client."
-        >
-          <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-tertiary p-3 text-left font-mono text-xs text-foreground">
-            {`import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
+          description={
+            <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-foreground">
+              {`import { useAblyDevTools } from '@avasapp/rozenite-plugin-ably'
 
 useAblyDevTools(ablyRealtimeClient)`}
-          </pre>
-        </EmptyState>
+            </pre>
+          }
+          icon={PlugZap}
+          title="Waiting for an instrumented Ably client."
+        />
       </Shell>
     )
   }
 
   return (
     <Shell>
-      <PluginHeader
-        actions={
-          <CaptureControls
-            capabilities={state.capabilities}
-            onClear={() => {
-              actions.clear()
-              setSelectedEventId(null)
-            }}
-            onTogglePause={() =>
-              actions.setOptions({ paused: !state.options.paused })
+      <Header>
+        <CaptureControls
+          capabilities={state.capabilities}
+          onClear={() => {
+            actions.clear()
+            setSelectedEventId(null)
+          }}
+          onTogglePause={() =>
+            actions.setOptions({ paused: !state.options.paused })
+          }
+          onToggleProtocol={() => {
+            const next = !state.options.captureProtocol
+            actions.setOptions({ captureProtocol: next })
+            // Enabling capture with the filter off would look like nothing
+            // happened, so reveal protocol rows at the same time.
+            if (next) {
+              setKinds((prev) => new Set(prev).add('protocol'))
             }
-            onToggleProtocol={() => {
-              const next = !state.options.captureProtocol
-              actions.setOptions({ captureProtocol: next })
-              // Enabling capture with the filter off would look like nothing
-              // happened, so reveal protocol rows at the same time.
-              if (next) {
-                setKinds((prev) => new Set(prev).add('protocol'))
-              }
-            }}
-            options={state.options}
-          />
-        }
-        subtitle={SUBTITLE}
-        title="Ably"
-      />
+          }}
+          options={state.options}
+        />
+      </Header>
 
       <ConnectionBar
         attachedCount={attachedCount}
@@ -175,36 +172,35 @@ useAblyDevTools(ablyRealtimeClient)`}
   )
 }
 
+/**
+ * `PluginShell` owns the theme class and the portal container that Select,
+ * Tooltip and friends mount into — without it those surfaces escape to
+ * `document.body` and render with light tokens. `Tooltip.Provider` sits inside
+ * it so the panel's tooltips share one open/close delay.
+ */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <PluginTheme
-      className="flex h-screen flex-col bg-background text-foreground"
-      defaultTheme="dark"
-    >
-      {children}
-    </PluginTheme>
+    <PluginShell>
+      <Tooltip.Provider>{children}</Tooltip.Provider>
+    </PluginShell>
   )
 }
 
-function EmptyState({
-  icon,
-  message,
-  children,
-}: {
-  icon: React.ReactNode
-  message: string
-  children?: React.ReactNode
-}) {
+function Header({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-      <Surface
-        className="flex max-w-md flex-col items-center gap-3 rounded-xl border border-border/70 px-6 py-8 text-center shadow-sm"
-        variant="secondary"
-      >
-        {icon}
-        <p className="text-sm font-medium text-foreground">{message}</p>
+    <PluginHeader>
+      <div className="flex min-w-0 flex-col">
+        <PluginHeader.Title>Ably</PluginHeader.Title>
+        <PluginHeader.Subtitle>{SUBTITLE}</PluginHeader.Subtitle>
+      </div>
+      <PluginHeader.Actions>
         {children}
-      </Surface>
-    </div>
+        <PluginHeader.ThemeSwitcher />
+      </PluginHeader.Actions>
+    </PluginHeader>
   )
+}
+
+function ConnectingSpinner({ className }: { className?: string }) {
+  return <Loader2 className={`${className ?? ''} animate-spin text-primary`} />
 }
