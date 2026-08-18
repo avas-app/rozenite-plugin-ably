@@ -4,7 +4,6 @@
     "strict": true,
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
-    "baseUrl": ".",
     "paths": {
       "@avasapp/rozenite-plugin-ably": ["../react-native.ts"]
     }
