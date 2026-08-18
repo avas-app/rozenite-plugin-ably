@@ -155,7 +155,8 @@ const { items } = await session.callTool(ablyTools.listChannels, {
 
 Rozenite serves its own agent docs from the CLI (`npx rozenite skills list`) and
 does not yet import skills from installed plugins, so this package ships one
-instead. Point your agent at `skills/ably/SKILL.md` — it covers the tool surface
+instead — install it with `npx skills add avas-app/rozenite-plugin-ably`, or
+point your agent at `skills/ably-devtools/SKILL.md`. It covers the tool surface
 plus the semantics the raw output does not convey, such as why a channel the app
 never subscribed to shows no inbound messages, and what the payload truncation
 markers mean.

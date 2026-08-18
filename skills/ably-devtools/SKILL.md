@@ -1,6 +1,6 @@
 ---
 name: ably-devtools
-description: Inspect Ably Realtime in a running React Native app through the @avasapp/rozenite-plugin-ably DevTools plugin — channels, live event stream, decoded payloads — via the `avasapp/ably` Rozenite agent domain. Use for any realtime debugging question: a channel that is not attached, a message that did not arrive, a payload whose contents are in doubt, or a connection that keeps failing.
+description: "Inspect Ably Realtime in a running React Native app through the @avasapp/rozenite-plugin-ably DevTools plugin — channels, live event stream, decoded payloads — via the `avasapp/ably` Rozenite agent domain. Use for any realtime debugging question, such as a channel that is not attached, a message that did not arrive, a payload whose contents are in doubt, or a connection that keeps failing."
 ---
 
 # Ably Realtime inspection
