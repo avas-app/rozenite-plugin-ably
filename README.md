@@ -26,8 +26,9 @@ means answering different questions:
 npm install --save-dev @avasapp/rozenite-plugin-ably
 ```
 
-Rozenite discovers the plugin automatically. No `metro.config` change is needed
-beyond having Rozenite itself set up.
+Requires **Rozenite 2.1 or later**. Rozenite discovers the plugin
+automatically — no `metro.config` change is needed beyond having Rozenite itself
+set up.
 
 ## Usage
 
@@ -113,6 +114,59 @@ searches payload contents too.
 it and keeps the original, so you get a real collapsible tree by default and the
 exact bytes on demand. Searching expands the tree far enough to reveal matches
 rather than filtering them out of their surrounding structure.
+
+## Agent tools
+
+The same session is exposed to [Rozenite for
+Agents](https://www.rozenite.dev) as the **`avasapp/ably`** domain, so a coding
+agent can inspect realtime traffic from the terminal with no DevTools window
+open:
+
+```bash
+npx rozenite agent session create
+npx rozenite agent avasapp/ably call --tool list-channels \
+  --args '{"onlyErrored":true}' --session <id>
+```
+
+| Tool | |
+| --- | --- |
+| `get-connection` | State, failure reason, `retryIn`, capabilities. |
+| `list-channels` | Paginated. Filters: `state`, `search`, `onlyErrored`, `includeReleased`. |
+| `read-channel` | One channel in full, including its listeners. |
+| `list-events` | Paginated. Filters: `channel`, `kind`, `dir`, `search`, `since`, `order`. |
+| `read-event` | One event with its decoded payload. |
+| `get-stats` | Counters, options, `retained` vs `dropped`. |
+| `set-options` | `paused`, `captureProtocol`, `maxEvents`. |
+| `clear` | Discard captured events. |
+| `channel-action` | `attach` / `detach` / `release`. |
+
+`list-events` deliberately omits payload bodies — a single message can carry
+128 KB, so a page of them would be unreadable. Find the id in a listing, then
+`read-event` for the one that matters. Its `search` covers decoded payload
+contents, which is how you answer "which message carried this device id".
+
+Only `set-options`, `clear` and `channel-action` change anything, and only
+`channel-action` touches Ably itself rather than what is recorded.
+
+For Node scripts built on `@rozenite/agent-sdk`, typed descriptors keep tool
+names and argument shapes checked:
+
+```ts
+import { ablyTools } from '@avasapp/rozenite-plugin-ably/sdk'
+
+const { items } = await session.callTool(ablyTools.listChannels, {
+  onlyErrored: true,
+})
+```
+
+### Agent skill
+
+Rozenite serves its own agent docs from the CLI (`npx rozenite skills list`) and
+does not yet import skills from installed plugins, so this package ships one
+instead. Point your agent at `skills/ably/SKILL.md` — it covers the tool surface
+plus the semantics the raw output does not convey, such as why a channel the app
+never subscribed to shows no inbound messages, and what the payload truncation
+markers mean.
 
 ## Design notes
 

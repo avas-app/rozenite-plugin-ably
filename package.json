@@ -1,7 +1,7 @@
 {
   "name": "@avasapp/rozenite-plugin-ably",
   "version": "0.2.0",
-  "description": "Ably Realtime inspector for React Native DevTools \u2014 inspect channels, stream live events, and preview decoded payloads.",
+  "description": "Ably Realtime inspector for React Native DevTools — inspect channels, stream live events, and preview decoded payloads.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/avas-app/rozenite-plugin-ably#readme",
@@ -28,10 +28,19 @@
       "import": "./dist/react-native/index.js",
       "require": "./dist/react-native/index.cjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./sdk": {
+      "development": "./sdk.ts",
+      "types": "./dist/sdk/index.d.ts",
+      "import": "./dist/sdk/index.js",
+      "require": "./dist/sdk/index.cjs"
+    }
   },
   "files": [
-    "dist"
+    "dist",
+    "sdk.ts",
+    "src/shared",
+    "skills"
   ],
   "keywords": [
     "ably",
@@ -50,11 +59,13 @@
     "prepublishOnly": "tsc -p tsconfig.json --noEmit && rozenite build"
   },
   "dependencies": {
-    "@rozenite/plugin-bridge": "^2.0.0"
+    "@rozenite/agent-bridge": "^2.1.0",
+    "@rozenite/agent-shared": "^2.1.0",
+    "@rozenite/plugin-bridge": "^2.1.0"
   },
   "devDependencies": {
-    "@rozenite/ui": "^2.0.0",
-    "@rozenite/vite-plugin": "^2.0.0",
+    "@rozenite/ui": "^2.1.0",
+    "@rozenite/vite-plugin": "^2.1.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/bun": "^1.3.14",
     "@types/react": "~19.2.2",
@@ -65,7 +76,7 @@
     "react-dom": "19.2.0",
     "react-native": "0.83.1",
     "react-native-web": "^0.21.2",
-    "rozenite": "^2.0.0",
+    "rozenite": "^2.1.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "vite": "^7.3.1"

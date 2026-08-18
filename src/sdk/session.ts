@@ -35,6 +35,17 @@ const CHANNEL_FLUSH_MS = 200
 
 const DEFAULT_MAX_EVENTS = 1000
 
+/**
+ * Device-side actions that `instrumentClient` attaches to a session after
+ * construction, rather than widening `Session`'s public API with methods that
+ * only mean anything once a client is patched. Declared here so every consumer
+ * agrees on the shape.
+ */
+export type SessionInternals = {
+  __setProtocolCapture?: (enabled: boolean) => void
+  __channelAction?: (action: string, channel: string) => void
+}
+
 export type SessionSink = {
   events: (events: AblyEvent[]) => void
   channels: (channels: ChannelSnapshot[]) => void
@@ -320,6 +331,48 @@ export class Session {
       since: stateChanged ? Date.now() : this.connection.since,
     }
     this.sink?.connection(this.connection)
+  }
+
+  // ------------------------------------------------------------ read access
+
+  /**
+   * Narrow projections for the agent tools, which query the session directly
+   * instead of going through the panel bridge. Kept separate from `snapshot()`
+   * because that copies the entire ring buffer on every call, and an agent
+   * listing twenty events should not pay for a thousand.
+   */
+  getConnection(): ConnectionSnapshot {
+    return this.connection
+  }
+
+  getStats(): SessionStats {
+    return this.stats
+  }
+
+  /** Live view of the retained buffer. Callers must not mutate it. */
+  getEvents(): readonly AblyEvent[] {
+    return this.events
+  }
+
+  getEvent(id: number): AblyEvent | undefined {
+    return this.events.find((event) => event.id === id)
+  }
+
+  /**
+   * Oldest id still retained, so a caller paging with a cursor can tell whether
+   * events fell out of the buffer between pages rather than silently skipping
+   * them.
+   */
+  oldestEventId(): number | undefined {
+    return this.events[0]?.id
+  }
+
+  getChannels(): ChannelSnapshot[] {
+    return this.channelSnapshots()
+  }
+
+  getChannel(name: string): ChannelSnapshot | undefined {
+    return this.channelSnapshots().find((channel) => channel.name === name)
   }
 
   // -------------------------------------------------------------- lifecycle

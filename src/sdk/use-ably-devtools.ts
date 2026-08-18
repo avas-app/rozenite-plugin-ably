@@ -5,7 +5,8 @@ import type { AblyDevToolsEventMap } from '../shared/types'
 import { PLUGIN_ID } from '../shared/types'
 import type { ClientLike } from './instrument'
 import { instrumentClient } from './instrument'
-import { Session } from './session'
+import { Session, type SessionInternals } from './session'
+import { useAblyAgentTools } from './use-ably-agent-tools'
 
 /**
  * Supplies human-readable labels for channel names.
@@ -39,11 +40,6 @@ declare const __DEV__: boolean
 
 function isDev(): boolean {
   return typeof __DEV__ === 'undefined' ? false : __DEV__
-}
-
-type SessionInternals = {
-  __setProtocolCapture?: (enabled: boolean) => void
-  __channelAction?: (action: string, channel: string) => void
 }
 
 /**
@@ -86,6 +82,10 @@ export function useAblyDevTools(
   const devToolsClient = useRozeniteDevToolsClient<AblyDevToolsEventMap>({
     pluginId: PLUGIN_ID,
   })
+
+  // Agent tools read the same session as the panel, and register independently
+  // of it — `rozenite agent` works with no DevTools window open.
+  useAblyAgentTools({ sessionRef, enabled: active })
 
   // ---- instrumentation lifecycle (independent of the panel) ----
   useEffect(() => {
