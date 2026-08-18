@@ -201,6 +201,55 @@ describe('read-event', () => {
     expect(event.payload?.raw).toBe('{"value":42}')
   })
 
+  test('leaves a small payload structured and untouched', () => {
+    const { client, session } = setup()
+    const channel = liveChannel(client, 'a')
+    channel.deliver({ name: 'tick', data: '{"value":42}' })
+
+    const { event } = handlers.readEvent(session, { id: 1 })
+
+    expect(event.payload?.value).toEqual({ value: 42 })
+    expect(event.payload?.truncated).toBeUndefined()
+    expect(event.payload?.note).toBeUndefined()
+  })
+
+  test('caps a large payload and drops the redundant structured copy', () => {
+    const { client, session } = setup()
+    const channel = liveChannel(client, 'a')
+    const big = JSON.stringify({
+      rows: Array.from({ length: 4000 }, (_, i) => ({ i, blob: 'x'.repeat(40) })),
+    })
+    channel.deliver({ name: 'BULK', data: big })
+
+    const { event } = handlers.readEvent(session, { id: 1 })
+    const payload = event.payload!
+
+    expect(payload.raw).toHaveLength(handlers.DEFAULT_READ_EVENT_BYTES)
+    expect(payload.truncated).toBe(true)
+    // `value` would carry the whole 4000-row structure a second time.
+    expect(payload.value).toBeUndefined()
+    // The true size is still reported honestly.
+    expect(payload.byteLength).toBe(big.length)
+    expect(payload.note).toMatch(/clipped to 8192 of \d+ bytes/)
+
+    // The stored event must not have been mutated by the capping.
+    expect(session.getEvent(1)!.payload!.value).toBeDefined()
+  })
+
+  test('maxBytes raises and clamps the cap', () => {
+    const { client, session } = setup()
+    const channel = liveChannel(client, 'a')
+    channel.deliver({ name: 'BULK', data: JSON.stringify({ blob: 'x'.repeat(60000) }) })
+
+    expect(
+      handlers.readEvent(session, { id: 1, maxBytes: 100 }).event.payload?.raw,
+    ).toHaveLength(100)
+
+    // Above the ceiling it clamps rather than honouring an arbitrary number.
+    const huge = handlers.readEvent(session, { id: 1, maxBytes: 10_000_000 })
+    expect(huge.event.payload?.truncated).toBeUndefined()
+  })
+
   test('names the retained id range when the event is gone', () => {
     const { client, session } = setup()
     const channel = liveChannel(client, 'a')

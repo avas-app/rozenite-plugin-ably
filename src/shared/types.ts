@@ -69,7 +69,7 @@ export type SerializedPayload = {
   byteLength?: number
   /** Ably's `encoding` field, verbatim (e.g. `json/utf-8/cipher+aes-256-cbc`). */
   encoding?: string | null
-  /** Why decoding failed, for `undecodable`. */
+  /** Why decoding failed for `undecodable`, or why a payload was clipped. */
   note?: string
 }
 

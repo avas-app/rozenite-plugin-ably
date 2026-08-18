@@ -41,7 +41,7 @@ of the ring buffer — restart the listing, do not treat it as "no more rows".
 | `list-channels` | Paginated. Hides released channels unless `includeReleased`. Filters: `state`, `search`, `onlyErrored`. |
 | `read-channel` | One channel in full, including registered listeners. |
 | `list-events` | Paginated. Filters: `channel`, `kind`, `dir`, `search`, `since`, `order`. **No payload bodies.** |
-| `read-event` | One event with its decoded payload. |
+| `read-event` | One event with its decoded payload, clipped to `maxBytes` (8 KB default). |
 | `get-stats` | Counters, current options, `retained` vs `dropped`. |
 | `set-options` | `paused`, `captureProtocol`, `maxEvents`. Touches capture only, never Ably. |
 | `clear` | Discards captured events. Destructive. |
@@ -69,9 +69,15 @@ delivered.
 
 **Payload markers are the plugin's, not your app's data.** `[Circular]`,
 `[Max depth reached]` (depth cap 12), `[Binary N bytes]`, `[Function]` and
-`[Unenumerable object]` are substituted during serialization. `truncated: true`
-means the payload exceeded 128 KB and was clipped. `byteLength` is approximate
-and undercounts non-ASCII.
+`[Unenumerable object]` are substituted during serialization. `byteLength` is
+approximate and undercounts non-ASCII.
+
+**`read-event` clips to 8 KB by default.** `truncated: true` with a `note` means
+you are seeing a prefix; `byteLength` still reports the payload's true size, and
+the structured `value` is dropped in favour of the clipped `raw` rather than
+sending the same content twice. Raise `maxBytes` (up to 131072) when you
+genuinely need more — a single uncapped realtime message can run to hundreds of
+kilobytes, which is worth spending deliberately rather than by accident.
 
 **`kind: "string"` does not mean "not JSON".** Ably delivers most payloads as a
 JSON *string*; the plugin parses it into `kind: "json"` and keeps the original

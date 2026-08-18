@@ -144,7 +144,15 @@ export type ListEventsResult = {
   page: PageEnvelope
 }
 
-export type ReadEventArgs = { id: number }
+export type ReadEventArgs = {
+  id: number
+  /**
+   * Cap on the payload text returned, in bytes. Defaults to 8192 — enough for
+   * an ordinary message, small enough that an unexpectedly large one cannot
+   * flood the caller.
+   */
+  maxBytes?: number
+}
 export type ReadEventResult = { event: AblyEvent }
 
 export type GetStatsArgs = undefined
@@ -315,11 +323,16 @@ export const ablyToolDefinitions = {
   readEvent: defineAgentToolContract<ReadEventArgs, ReadEventResult>({
     name: 'read-event',
     description:
-      'Read one event in full, including its decoded payload. Payloads are capped at 128KB and marked truncated when clipped.',
+      'Read one event in full, including its decoded payload. The payload is clipped to maxBytes (8KB by default) and marked truncated, with byteLength reporting the true size.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'number', description: 'Event id from list-events.' },
+        maxBytes: {
+          type: 'number',
+          description:
+            'Cap on returned payload text. Defaults to 8192, maximum 131072.',
+        },
       },
       required: ['id'],
     },

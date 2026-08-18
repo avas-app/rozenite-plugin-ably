@@ -14,7 +14,12 @@
 
 import { DEFAULT_PAGE_LIMIT } from '@rozenite/agent-shared'
 
-import type { AblyEvent, ChannelSnapshot, SdkOptions } from '../shared/types'
+import type {
+  AblyEvent,
+  ChannelSnapshot,
+  SdkOptions,
+  SerializedPayload,
+} from '../shared/types'
 import type {
   AblyChannelRow,
   AblyEventRow,
@@ -39,6 +44,10 @@ import type { Session, SessionInternals } from './session'
 
 /** Upper bound on a page, so a bad `limit` cannot dump the whole buffer. */
 export const MAX_LIMIT = 200
+
+/** Payload text `read-event` returns by default, and the ceiling it allows. */
+export const DEFAULT_READ_EVENT_BYTES = 8 * 1024
+export const MAX_READ_EVENT_BYTES = 128 * 1024
 
 function clampLimit(limit?: number): number {
   if (typeof limit !== 'number' || !Number.isFinite(limit)) {
@@ -225,9 +234,55 @@ export function listEvents(
   }
 }
 
+/**
+ * Bounds the payload text a single `read-event` returns.
+ *
+ * The serializer's own 128KB cap clips `raw` but passes a *parsed* `value`
+ * through whole, because the panel renders it as a lazily-expanded tree and
+ * wants the real structure. An agent has no such affordance: the whole thing
+ * lands in its context at once, and a 322KB message came back as a 477KB
+ * response — larger than the payload itself, since `raw` and `value` both
+ * carry it.
+ *
+ * So the agent path caps the text and drops the redundant structured copy,
+ * keeping `byteLength` honest about the true size.
+ */
+function boundPayload(
+  payload: SerializedPayload,
+  maxBytes: number,
+): SerializedPayload {
+  let text = typeof payload.raw === 'string' ? payload.raw : undefined
+
+  if (text === undefined && payload.value !== undefined) {
+    try {
+      text =
+        typeof payload.value === 'string'
+          ? payload.value
+          : JSON.stringify(payload.value)
+    } catch {
+      return payload
+    }
+  }
+
+  if (text === undefined || text.length <= maxBytes) return payload
+
+  // Report the payload's true size, not the length of `text` — the serializer
+  // may already have clipped `raw` at its own 128KB cap, and quoting that
+  // figure would understate how much is actually missing.
+  const total = payload.byteLength ?? text.length
+
+  return {
+    ...payload,
+    value: undefined,
+    raw: text.slice(0, maxBytes),
+    truncated: true,
+    note: `clipped to ${maxBytes} of ${total} bytes; raise maxBytes (max ${MAX_READ_EVENT_BYTES}) for more`,
+  }
+}
+
 export function readEvent(
   session: Session,
-  { id }: ReadEventArgs,
+  { id, maxBytes }: ReadEventArgs,
 ): ReadEventResult {
   const event = session.getEvent(id)
   if (!event) {
@@ -238,7 +293,15 @@ export function readEvent(
         : `retained ids are ${events[0].id}–${events[events.length - 1].id}`
     throw new Error(`Event ${id} is not retained (${range}).`)
   }
-  return { event }
+
+  if (!event.payload) return { event }
+
+  const cap =
+    typeof maxBytes === 'number' && Number.isFinite(maxBytes)
+      ? Math.min(MAX_READ_EVENT_BYTES, Math.max(1, Math.floor(maxBytes)))
+      : DEFAULT_READ_EVENT_BYTES
+
+  return { event: { ...event, payload: boundPayload(event.payload, cap) } }
 }
 
 export function getStats(session: Session): GetStatsResult {
