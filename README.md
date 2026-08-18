@@ -1,5 +1,7 @@
 # @avasapp/rozenite-plugin-ably
 
+[![npm](https://img.shields.io/npm/v/@avasapp/rozenite-plugin-ably)](https://www.npmjs.com/package/@avasapp/rozenite-plugin-ably)
+
 An [Ably](https://ably.com) Realtime inspector for React Native DevTools, built on
 [Rozenite](https://www.rozenite.dev).
 
@@ -8,17 +10,6 @@ The Network Activity panel already shows you websocket frames. This shows you
 messages actually arrived, and what was inside them.
 
 ![The Ably panel in React Native DevTools: attached channels with labels and counters on the left, a filterable event stream in the middle, and the decoded payload of the selected message on the right.](docs/panel.jpeg)
-
-## Why
-
-A websocket inspector answers "what bytes moved". Debugging realtime usually
-means answering different questions:
-
-- Which channels are attached *right now* — and which ones silently went
-  `suspended` twenty minutes ago?
-- How many subscribers does this channel have, and which feature registered them?
-- Did that message actually arrive, or is the UI just not re-rendering?
-- What was in the payload — as a tree, not as one escaped JSON string?
 
 ## Install
 
@@ -134,16 +125,17 @@ npx rozenite agent avasapp/ably call --tool list-channels \
 | `list-channels` | Paginated. Filters: `state`, `search`, `onlyErrored`, `includeReleased`. |
 | `read-channel` | One channel in full, including its listeners. |
 | `list-events` | Paginated. Filters: `channel`, `kind`, `dir`, `search`, `since`, `order`. |
-| `read-event` | One event with its decoded payload. |
+| `read-event` | One event with its decoded payload, clipped to `maxBytes` (8 KB default). |
 | `get-stats` | Counters, options, `retained` vs `dropped`. |
 | `set-options` | `paused`, `captureProtocol`, `maxEvents`. |
 | `clear` | Discard captured events. |
 | `channel-action` | `attach` / `detach` / `release`. |
 
 `list-events` deliberately omits payload bodies — a single message can carry
-128 KB, so a page of them would be unreadable. Find the id in a listing, then
-`read-event` for the one that matters. Its `search` covers decoded payload
-contents, which is how you answer "which message carried this device id".
+hundreds of kilobytes, so a page of them would be unreadable. Find the id in a
+listing, then `read-event` for the one that matters, which itself clips to 8 KB
+unless you raise `maxBytes`. `search` covers decoded payload contents, which is
+how you answer "which message carried this device id".
 
 Only `set-options`, `clear` and `channel-action` change anything, and only
 `channel-action` touches Ably itself rather than what is recorded.
@@ -168,26 +160,7 @@ plus the semantics the raw output does not convey, such as why a channel the app
 never subscribed to shows no inbound messages, and what the payload truncation
 markers mean.
 
-## Design notes
-
-A few decisions that are load-bearing if you plan to modify this:
-
-- **Your listeners are never wrapped.** Message content is observed through a
-  separate passive subscription, so a bug in this plugin cannot stop your app
-  receiving a message.
-- **No attach is ever caused that your app did not ask for.** The passive
-  subscription is installed lazily, only once your app has itself subscribed to
-  that channel.
-- **Nothing throws into your call path.** Every patched method calls through in a
-  `finally`, and all bookkeeping is guarded. A payload whose getter throws is
-  still recorded — marked undecodable — rather than silently dropped.
-- **Fully reversible.** Every patch stores its original and is restored on
-  unmount, so hot reload does not stack wrappers.
-- **No `ably` dependency.** The client is typed structurally, so this package
-  works against whatever ably-js version you have and adds nothing to your
-  dependency graph.
-
-### Protocol capture
+## Protocol capture
 
 Enabling protocol capture calls `client.setLog({ level: 4 })`. That method is
 present at runtime but is not in ably-js's public typings, so it is
