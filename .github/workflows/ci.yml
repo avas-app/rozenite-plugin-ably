@@ -1,0 +1,46 @@
+name: CI
+
+# Gates every change, including the weekly Dependabot PRs that bump the Rozenite
+# group. Discovery of new Rozenite releases is Dependabot's job (see
+# .github/dependabot.yml) — this is what decides whether one is safe to merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # First, and before installing anything: Dependabot updates
+      # devDependencies but not peerDependencies, so a Rozenite major arrives
+      # with half the manifest bumped. Everything below this would pass anyway.
+      - name: Peer ranges
+        run: node scripts/check-peer-ranges.mjs
+
+      - run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test src/
+
+      - name: Build
+        run: bun run build
+
+      # Resolves the packed tarball from a real consumer install. The example
+      # app cannot catch a duplicate bridge — its metro.config puts the plugin's
+      # own node_modules on the resolver path.
+      - name: Peer resolution
+        run: |
+          node scripts/check-peer-resolution.mjs \
+            "$(node -p "require('./node_modules/rozenite/package.json').version")"

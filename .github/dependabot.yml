@@ -1,0 +1,40 @@
+# Rozenite ships its packages in lockstep and pins them to each other exactly
+# (`rozenite@2.2.0` requires `@rozenite/agent-shared@2.2.0`, no caret), so they
+# have to be bumped together. Ungrouped, most of the individual PRs would be
+# unsatisfiable.
+#
+# Note that Dependabot does not touch `peerDependencies`
+# (dependabot/dependabot-core#1242). This package declares the bridge in both
+# `devDependencies` and `peerDependencies`, so a Rozenite bump lands with only
+# half the manifest updated — `scripts/check-peer-ranges.mjs` runs in CI to fail
+# those PRs rather than let them merge green.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      rozenite:
+        patterns:
+          - rozenite
+          - '@rozenite/*'
+
+  - package-ecosystem: npm
+    directory: /example
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      rozenite:
+        patterns:
+          - rozenite
+          - '@rozenite/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
