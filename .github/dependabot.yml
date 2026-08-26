@@ -3,11 +3,14 @@
 # have to be bumped together. Ungrouped, most of the individual PRs would be
 # unsatisfiable.
 #
+# React is grouped for a different reason: `react` and `react-dom` must resolve
+# to the *exact* same version or the renderer throws "Incompatible React
+# versions" at startup. A PR bumping one without the other cannot pass.
+#
 # Note that Dependabot does not touch `peerDependencies`
-# (dependabot/dependabot-core#1242). This package declares the bridge in both
-# `devDependencies` and `peerDependencies`, so a Rozenite bump lands with only
-# half the manifest updated — `scripts/check-peer-ranges.mjs` runs in CI to fail
-# those PRs rather than let them merge green.
+# (dependabot/dependabot-core#1242), and does not write `bun.lock` for these
+# updates. `scripts/check-peer-ranges.mjs` covers the first; the `lockfile` job
+# in ci.yml covers the second.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -21,6 +24,12 @@ updates:
         patterns:
           - rozenite
           - '@rozenite/*'
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
 
   - package-ecosystem: npm
     directory: /example
@@ -33,6 +42,12 @@ updates:
         patterns:
           - rozenite
           - '@rozenite/*'
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
 
   - package-ecosystem: github-actions
     directory: /

@@ -1,7 +1,7 @@
 name: CI
 
 # Gates every change, including the weekly Dependabot PRs that bump the Rozenite
-# group. Discovery of new Rozenite releases is Dependabot's job (see
+# and React groups. Discovery of new releases is Dependabot's job (see
 # .github/dependabot.yml) — this is what decides whether one is safe to merge.
 
 on:
@@ -11,7 +11,54 @@ on:
   workflow_dispatch:
 
 jobs:
+  lockfile:
+    # Dependabot updates package.json but does not write bun.lock, so its PRs
+    # arrive with the two out of sync and fail the frozen install below — and
+    # merging one would leave main's lockfile stale too. This commits the
+    # missing update back onto the PR branch, which starts a fresh run.
+    name: Dependabot lockfile
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      pushed: ${{ steps.commit.outputs.pushed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+      - name: Resolve the example lockfile too
+        run: bun install
+        working-directory: example
+
+      - id: commit
+        name: Commit the lockfiles if they moved
+        run: |
+          if git diff --quiet -- bun.lock example/bun.lock; then
+            echo "lockfiles already in sync"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bun.lock example/bun.lock
+          git commit -m 'Resolve the bun lockfiles for this bump'
+          git push
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: lockfile
+    # `lockfile` is skipped for everything that is not Dependabot, and a skipped
+    # dependency would otherwise skip this job too. When it did push, the run it
+    # started supersedes this one.
+    if: |
+      always()
+      && needs.lockfile.result != 'failure'
+      && needs.lockfile.outputs.pushed != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
