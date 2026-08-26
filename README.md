@@ -17,9 +17,15 @@ messages actually arrived, and what was inside them.
 npm install --save-dev @avasapp/rozenite-plugin-ably
 ```
 
-Requires **Rozenite 2.1 or later**. Rozenite discovers the plugin
+Requires **Rozenite 2.2 or later**. Rozenite discovers the plugin
 automatically — no `metro.config` change is needed beyond having Rozenite itself
 set up.
+
+The plugin ships no runtime dependencies of its own. `@rozenite/plugin-bridge`,
+`@rozenite/agent-bridge` and `@rozenite/agent-shared` are peer dependencies, so
+the plugin shares your app's copy of the bridge rather than resolving a second one
+alongside it — two bridge instances mean the panel never connects. Any Rozenite
+2.x works; only a Rozenite major needs a matching release here.
 
 ## Usage
 

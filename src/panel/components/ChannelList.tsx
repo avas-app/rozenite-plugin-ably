@@ -130,7 +130,7 @@ export function ChannelList({
         <Button
           className="m-2 justify-start"
           onClick={() => onSelect(null)}
-          size="compact"
+          size="sm"
           variant="ghost"
         >
           <X />
@@ -252,7 +252,7 @@ function ChannelRow({
             <Badge
               className="bg-primary/15 text-primary"
               key={label}
-              variant="secondary"
+              variant="soft"
             >
               {label}
             </Badge>
@@ -285,7 +285,7 @@ function ChannelRow({
               onClick={() =>
                 onAction(isAttached ? 'detach' : 'attach', channel.name)
               }
-              size="compact"
+              size="sm"
               variant="ghost"
             >
               {isAttached ? 'detach' : 'attach'}

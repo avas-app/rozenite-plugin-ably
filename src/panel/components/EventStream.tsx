@@ -81,8 +81,8 @@ export function EventStream({
             <Button
               key={kind}
               onClick={() => onToggleKind(kind)}
-              size="compact"
-              variant={kinds.has(kind) ? 'secondary' : 'ghost'}
+              size="sm"
+              variant={kinds.has(kind) ? 'soft' : 'ghost'}
             >
               {kindLabel(kind)}
             </Button>

@@ -30,8 +30,8 @@ export function CaptureControls({
       >
         <Button
           onClick={onTogglePause}
-          size="compact"
-          variant={options.paused ? 'default' : 'ghost'}
+          size="sm"
+          variant={options.paused ? 'solid' : 'ghost'}
         >
           {options.paused ? <Play /> : <Pause />}
           {options.paused ? 'Resume' : 'Pause'}
@@ -48,8 +48,8 @@ export function CaptureControls({
         <Button
           disabled={!capabilities.protocol}
           onClick={onToggleProtocol}
-          size="compact"
-          variant={options.captureProtocol ? 'secondary' : 'ghost'}
+          size="sm"
+          variant={options.captureProtocol ? 'soft' : 'ghost'}
         >
           <Radio />
           Protocol
@@ -57,12 +57,13 @@ export function CaptureControls({
       </ControlTooltip>
 
       <ControlTooltip content="Clear captured events">
-        {/* `size="icon"` is a full-height square; this row is `compact`. */}
+        {/* Icon-only, but `IconButton` renders a square on the `Size` scale;
+            this row needs it narrower than `sm` would be. */}
         <Button
           aria-label="Clear"
           className="w-6 px-0"
           onClick={onClear}
-          size="compact"
+          size="sm"
           variant="ghost"
         >
           <Trash2 />

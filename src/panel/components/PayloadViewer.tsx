@@ -88,7 +88,7 @@ export function PayloadViewer({ event, query }: PayloadViewerProps) {
             onClick={() => {
               void copy(copyText()).catch(() => {})
             }}
-            size="compact"
+            size="sm"
             variant="ghost"
           >
             {copied ? <Check className="text-success" /> : <Copy />}

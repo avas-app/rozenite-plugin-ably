@@ -94,7 +94,7 @@ export function ToneBadge({
   children: ReactNode
 }) {
   return (
-    <Badge className={toneBadgeClass(tone)} variant="secondary">
+    <Badge className={toneBadgeClass(tone)} variant="soft">
       {children}
     </Badge>
   )
