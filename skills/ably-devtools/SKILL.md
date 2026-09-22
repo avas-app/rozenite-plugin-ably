@@ -158,6 +158,12 @@ What this means when you use it:
   `subscribe('ride_assignment', cb)` receives nothing else; an unfiltered
   `subscribe(cb)` receives everything.
 - **It is not idempotent.** Two calls deliver twice, and the app reacts twice.
+- **Keep `data` JSON-safe.** The listener receives the value you passed; the
+  recorded event stores a JSON copy. So `undefined` fields silently vanish from
+  the record and `NaN`/`Infinity` become `null`, with no marker — leaving the app
+  and `read-event` disagreeing about what arrived. This applies to any payload
+  assembled in JS — including a schema-generated one you then patch, say to stamp
+  a real timestamp. A payload that came from JSON round-trips unchanged.
 - **Whatever the listener does really happens** — navigation, a write, a refetch.
   It is not marked destructive, because it deletes and overwrites nothing, but it
   is not read-only either: it drives the app under test.
