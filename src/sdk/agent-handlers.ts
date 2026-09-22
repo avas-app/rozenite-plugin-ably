@@ -26,6 +26,8 @@ import type {
   ChannelActionArgs,
   ChannelActionResult,
   ClearResult,
+  EmitEventArgs,
+  EmitEventResult,
   GetConnectionResult,
   GetStatsResult,
   ListChannelsArgs,
@@ -40,7 +42,7 @@ import type {
   SetOptionsResult,
   SortOrder,
 } from '../shared/agent-tools'
-import type { Session, SessionInternals } from './session'
+import type { InjectionOutcome, Session, SessionInternals } from './session'
 
 /** Upper bound on a page, so a bad `limit` cannot dump the whole buffer. */
 export const MAX_LIMIT = 200
@@ -96,6 +98,7 @@ export function toEventRow(event: AblyEvent): AblyEventRow {
     bytes: event.payload?.byteLength,
     hasPayload: event.payload !== undefined,
     error: event.error?.message,
+    injected: event.injected,
   }
 }
 
@@ -369,4 +372,101 @@ export function channelAction(
   internals.__channelAction(action, channel)
 
   return { channel, action, dispatched: true }
+}
+
+/** Deliberately unlike Ably's own `connId:serial:index` id format. */
+let nextInjectionSerial = 1
+
+/**
+ * `delivered: 0` is not an error — the event really was injected — but a caller
+ * about to assert on the app's reaction would otherwise debug that assertion
+ * instead of the missing `subscribe()`.
+ */
+function injectionNote(
+  channel: string,
+  { eventId, delivered, skipped, failed }: InjectionOutcome,
+): string | undefined {
+  const notes: string[] = []
+
+  if (delivered === 0) {
+    notes.push(
+      skipped > 0
+        ? `Nothing received it: all ${skipped} listener(s) on "${channel}" filter for other event names — read-channel shows each listener's events filter.`
+        : `Nothing received it: "${channel}" has no app listener. The app must call subscribe() before an injection can reach it.`,
+    )
+  }
+  if (failed > 0) {
+    notes.push(
+      `${failed} listener(s) threw; see errors. The others still received it, exactly as they would from a real message.`,
+    )
+  }
+  if (eventId === undefined) {
+    notes.push(
+      'Capture is paused, so this was delivered but not recorded — it will not appear in list-events.',
+    )
+  }
+
+  return notes.length > 0 ? notes.join(' ') : undefined
+}
+
+export function emitEvent(
+  session: Session,
+  { channel, name, data, clientId, connectionId, messageId }: EmitEventArgs,
+): EmitEventResult {
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new Error(
+      'emit-event requires a non-empty name — the message name an app subscribe(name, cb) filters on.',
+    )
+  }
+
+  // Refuse rather than no-op, as channel-action does: a silent success would
+  // read as "the app received it".
+  const snapshot = session.getChannel(channel)
+  if (!snapshot) {
+    throw new Error(
+      `Channel "${channel}" has not been seen on this client. Use list-channels to see what has.`,
+    )
+  }
+  if (snapshot.released) {
+    throw new Error(
+      `Channel "${channel}" has been released, so its listeners are gone. The app has to subscribe again before an injection can reach it.`,
+    )
+  }
+
+  const internals = session as unknown as SessionInternals
+  if (!internals.__emitEvent) {
+    throw new Error('Event injection is unavailable: no client is instrumented.')
+  }
+
+  const id = messageId ?? `injected:${nextInjectionSerial++}`
+
+  const outcome = internals.__emitEvent(channel, {
+    id,
+    name,
+    data,
+    clientId,
+    connectionId,
+    timestamp: Date.now(),
+    // Ably sets `encoding` only when it has *not* already decoded the payload.
+    encoding: null,
+  })
+
+  if (!outcome) {
+    throw new Error(
+      `Channel "${channel}" is not instrumented, so there is nothing to deliver to.`,
+    )
+  }
+
+  return {
+    channel,
+    name,
+    local: true,
+    messageId: id,
+    eventId: outcome.eventId,
+    delivered: outcome.delivered,
+    skipped: outcome.skipped,
+    failed: outcome.failed,
+    errors: outcome.errors,
+    note: injectionNote(channel, outcome),
+  }
 }

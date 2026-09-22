@@ -1,6 +1,6 @@
 import type { AblyEvent, ChannelState, ConnectionState } from '../shared/types'
 import { serializeError, serializePayload } from './serialize'
-import type { Session } from './session'
+import type { InjectedMessage, InjectionOutcome, Session } from './session'
 
 /**
  * Instruments a live `Ably.Realtime` client by patching its public surface.
@@ -19,6 +19,9 @@ import type { Session } from './session'
  *     because that is the point at which an attach was already going to happen.
  *  4. **Fully reversible.** Every patch stores its original and is restored on
  *     dispose, so hot reload cannot stack wrappers.
+ *
+ * `emit-event` is the one path that calls an app listener rather than only
+ * observing one — see `emitEvent` at the bottom.
  *
  * The client is typed structurally rather than against `ably` so this package
  * has no runtime or type dependency on the SDK version in the host app.
@@ -691,6 +694,78 @@ export function instrumentClient(
       if (result && typeof result.catch === 'function') result.catch(() => {})
     })
   }
+
+  // ------------------------------------------------------- event injection
+
+  /**
+   * Hands a fabricated message to the channel's own app listeners.
+   *
+   * **Never publishes.** A real publish reaches every other client attached to
+   * the channel — another developer's app, or a real device — and needs the
+   * network, so it could neither run offline nor complete deterministically
+   * inside a test.
+   */
+  function emitEvent(
+    name: string,
+    message: InjectedMessage,
+  ): InjectionOutcome | null {
+    const patch = patches.get(name)
+    if (!patch) return null
+
+    // Before delivery, so the injection sorts ahead of anything a listener
+    // publishes in response. The spy is not invoked: it would record a second
+    // copy, as though Ably had delivered it too.
+    const payload = serializePayload(message.data)
+    const eventId = session.push({
+      kind: 'message',
+      dir: 'in',
+      injected: true,
+      channel: name,
+      name: message.name,
+      messageId: message.id,
+      clientId: message.clientId,
+      connectionId: message.connectionId,
+      timestamp: message.timestamp,
+      payload,
+      summary: `injected ${message.name}${summarisePayloadSize(
+        payload.byteLength,
+      )}`,
+    })
+
+    let delivered = 0
+    let skipped = 0
+    const errors: string[] = []
+
+    // Copied: a listener may subscribe or unsubscribe while it runs.
+    for (const { listener, events } of [...patch.registrations]) {
+      if (typeof listener !== 'function') {
+        skipped++
+        continue
+      }
+      if (events && !events.includes(message.name)) {
+        skipped++
+        continue
+      }
+      try {
+        ;(listener as AnyFn)(message)
+        delivered++
+      } catch (error) {
+        // Isolated per listener as ably-js's own `callListener` is, but reported
+        // rather than swallowed: an agent driving a test needs to know.
+        errors.push(error instanceof Error ? error.message : String(error))
+      }
+    }
+
+    return {
+      eventId,
+      delivered,
+      skipped,
+      failed: errors.length,
+      errors: errors.length > 0 ? errors : undefined,
+    }
+  }
+
+  ;(session as unknown as Record<string, unknown>).__emitEvent = emitEvent
 
   // ---------------------------------------------------------------- dispose
 

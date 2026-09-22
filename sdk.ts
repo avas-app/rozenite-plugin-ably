@@ -39,6 +39,8 @@ export type {
   ChannelActionResult,
   ClearArgs,
   ClearResult,
+  EmitEventArgs,
+  EmitEventResult,
   GetConnectionArgs,
   GetConnectionResult,
   GetStatsArgs,

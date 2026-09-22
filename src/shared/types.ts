@@ -170,6 +170,12 @@ export type AblyEvent = {
   /** State transitions: where we came from. */
   from?: string
   labels?: string[]
+  /**
+   * True when `emit-event` fabricated this locally instead of Ably delivering
+   * it. The `summary` is prefixed too, so a listing that did not ask for this
+   * field still shows which rows are synthetic.
+   */
+  injected?: boolean
 }
 
 /** Rolling counters for the panel's header. */
