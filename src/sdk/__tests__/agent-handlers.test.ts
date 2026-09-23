@@ -499,12 +499,12 @@ describe('emit-event', () => {
     return received
   }
 
-  test('hands the app’s own subscriber a message shaped like a real one', () => {
+  test('hands the app’s own subscriber a message shaped like a real one', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'bid-orders')
     const received = listening(channel)
 
-    const result = handlers.emitEvent(session, {
+    const result = await handlers.emitEvent(session, {
       channel: 'bid-orders',
       name: 'ride_assignment',
       data: { rideId: 'r_42' },
@@ -527,12 +527,12 @@ describe('emit-event', () => {
 
   // The whole reason this tool injects locally: a real publish would reach every
   // other client on the channel, including someone else's app or a real device.
-  test('never publishes to the real channel', () => {
+  test('never publishes to the real channel', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'bid-orders')
     listening(channel)
 
-    handlers.emitEvent(session, {
+    await handlers.emitEvent(session, {
       channel: 'bid-orders',
       name: 'ride_assignment',
       data: { rideId: 'r_42' },
@@ -542,23 +542,23 @@ describe('emit-event', () => {
     expect(handlers.listEvents(session, { dir: 'out' }).items).toEqual([])
   })
 
-  test('fabricates an id that cannot be mistaken for Ably’s own', () => {
+  test('fabricates an id that cannot be mistaken for Ably’s own', async () => {
     const { client, session } = setup()
     listening(channelOf(client, 'a'))
 
-    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
 
     expect(result.messageId).toStartWith('injected:')
   })
 
-  test('honours an event-name filter, and counts what it passed over', () => {
+  test('honours an event-name filter, and counts what it passed over', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'bid-orders')
     const matching = listening(channel, 'ride_assignment')
     const other = listening(channel, 'ride_cancelled')
     const unfiltered = listening(channel)
 
-    const result = handlers.emitEvent(session, {
+    const result = await handlers.emitEvent(session, {
       channel: 'bid-orders',
       name: 'ride_assignment',
     })
@@ -570,23 +570,23 @@ describe('emit-event', () => {
     expect(result.skipped).toBe(1)
   })
 
-  test('records the injection exactly once, not twice via the spy', () => {
+  test('records the injection exactly once, not twice via the spy', async () => {
     const { client, session } = setup()
     // Subscribing is what installs the passive spy.
     listening(channelOf(client, 'a'))
 
-    handlers.emitEvent(session, { channel: 'a', name: 'tick', data: '1' })
+    await handlers.emitEvent(session, { channel: 'a', name: 'tick', data: '1' })
 
     expect(handlers.listEvents(session, { kind: 'message' }).items).toHaveLength(1)
   })
 
-  test('marks the recorded event injected, in the row and the summary', () => {
+  test('marks the recorded event injected, in the row and the summary', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'a')
     listening(channel)
     channel.deliver({ name: 'real', data: '1' })
 
-    const result = handlers.emitEvent(session, {
+    const result = await handlers.emitEvent(session, {
       channel: 'a',
       name: 'synthetic',
       data: '2',
@@ -598,11 +598,11 @@ describe('emit-event', () => {
     expect(rows[1].id).toBe(result.eventId!)
   })
 
-  test('the recorded event carries the payload back to read-event', () => {
+  test('the recorded event carries the payload back to read-event', async () => {
     const { client, session } = setup()
     listening(channelOf(client, 'a'))
 
-    const { eventId } = handlers.emitEvent(session, {
+    const { eventId } = await handlers.emitEvent(session, {
       channel: 'a',
       name: 'ride_assignment',
       data: { rideId: 'r_42' },
@@ -614,14 +614,14 @@ describe('emit-event', () => {
     expect(event.payload?.value).toEqual({ rideId: 'r_42' })
   })
 
-  test('sorts ahead of whatever the listener publishes in response', () => {
+  test('sorts ahead of whatever the listener publishes in response', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'a')
     channel.subscribe(() => {
       channel.publish('ack', '1')
     })
 
-    handlers.emitEvent(session, { channel: 'a', name: 'ride_assignment' })
+    await handlers.emitEvent(session, { channel: 'a', name: 'ride_assignment' })
 
     expect(
       handlers.listEvents(session, { kind: 'message', order: 'asc' }).items.map(
@@ -631,11 +631,11 @@ describe('emit-event', () => {
   })
 
   // Delivering to nobody is not an error: the event really was injected.
-  test('says so when the channel has no listener at all', () => {
+  test('says so when the channel has no listener at all', async () => {
     const { client, session } = setup()
     channelOf(client, 'a')
 
-    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
 
     expect(result.delivered).toBe(0)
     expect(result.skipped).toBe(0)
@@ -643,18 +643,18 @@ describe('emit-event', () => {
     expect(result.eventId).toBeDefined()
   })
 
-  test('says so when every listener filtered the name out', () => {
+  test('says so when every listener filtered the name out', async () => {
     const { client, session } = setup()
     listening(channelOf(client, 'a'), 'something_else')
 
-    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
 
     expect(result.delivered).toBe(0)
     expect(result.skipped).toBe(1)
-    expect(result.note).toMatch(/filter for other event names/)
+    expect(result.note).toMatch(/filter it out/)
   })
 
-  test('one listener throwing does not stop the rest, and is reported', () => {
+  test('one listener throwing does not stop the rest, and is reported', async () => {
     const { client, session } = setup()
     const channel = channelOf(client, 'a')
     channel.subscribe(() => {
@@ -662,7 +662,7 @@ describe('emit-event', () => {
     })
     const survivor = listening(channel)
 
-    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
 
     expect(survivor).toHaveLength(1)
     expect(result.delivered).toBe(1)
@@ -671,12 +671,12 @@ describe('emit-event', () => {
     expect(result.note).toMatch(/threw/)
   })
 
-  test('delivers while paused, but reports that nothing was recorded', () => {
+  test('delivers while paused, but reports that nothing was recorded', async () => {
     const { client, session } = setup()
     const received = listening(channelOf(client, 'a'))
     handlers.setOptions(session, { paused: true })
 
-    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
 
     expect(received).toHaveLength(1)
     expect(result.delivered).toBe(1)
@@ -684,39 +684,123 @@ describe('emit-event', () => {
     expect(result.note).toMatch(/paused/)
   })
 
-  test('refuses an unknown channel rather than silently succeeding', () => {
-    const { session } = setup()
-    expect(() =>
-      handlers.emitEvent(session, { channel: 'nope', name: 'tick' }),
-    ).toThrow(/has not been seen/)
+  // Real Ably evaluates a MessageFilter; treating it as unfiltered would make
+  // the app react to messages it could never receive.
+  test('honours a MessageFilter object, as Ably would', async () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'a')
+    const byName: unknown[] = []
+    const otherName: unknown[] = []
+    const byClient: unknown[] = []
+    const refsOnly: unknown[] = []
+    channel.subscribe({ name: 'ride_assignment' }, (m: unknown) => byName.push(m))
+    channel.subscribe({ name: 'ride_cancelled' }, (m: unknown) => otherName.push(m))
+    channel.subscribe({ clientId: 'dispatcher' }, (m: unknown) => byClient.push(m))
+    channel.subscribe({ isRef: true }, (m: unknown) => refsOnly.push(m))
+
+    const result = await handlers.emitEvent(session, {
+      channel: 'a',
+      name: 'ride_assignment',
+      clientId: 'dispatcher',
+    })
+
+    expect(byName).toHaveLength(1)
+    expect(byClient).toHaveLength(1)
+    expect(otherName).toHaveLength(0)
+    // An injected message carries no extras.ref.
+    expect(refsOnly).toHaveLength(0)
+    expect(result.delivered).toBe(2)
+    expect(result.skipped).toBe(2)
   })
 
-  test('refuses a released channel, whose listeners are gone', () => {
+  test('reports an async listener that rejects', async () => {
+    const { client, session } = setup()
+    channelOf(client, 'a').subscribe(async () => {
+      throw new Error('saga failed')
+    })
+
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(result.delivered).toBe(0)
+    expect(result.failed).toBe(1)
+    expect(result.errors).toEqual(['saga failed'])
+    expect(result.note).toMatch(/rejected/)
+  })
+
+  test('returns only once an async listener has finished reacting', async () => {
+    const { client, session } = setup()
+    let reacted = false
+    channelOf(client, 'a').subscribe(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      reacted = true
+    })
+
+    const result = await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(reacted).toBe(true)
+    expect(result.delivered).toBe(1)
+    expect(result.pending).toBeUndefined()
+  })
+
+  test('is recorded, but not counted as inbound traffic', async () => {
+    const { client, session } = setup()
+    listening(channelOf(client, 'a'))
+
+    await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(handlers.getStats(session).stats.messagesIn).toBe(0)
+    expect(handlers.readChannel(session, { name: 'a' }).channel.counters.in).toBe(0)
+    expect(handlers.listEvents(session, { kind: 'message' }).items).toHaveLength(1)
+  })
+
+  test('reaches channels of every client instrumented into the session', async () => {
+    const { client, session, dispose } = setup()
+    const second = new MockClient()
+    const disposeSecond = instrumentClient(second as never, session)
+    const first = listening(channelOf(client, 'a'))
+    const other = listening(channelOf(second, 'b'))
+
+    await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    await handlers.emitEvent(session, { channel: 'b', name: 'tick' })
+    expect(first).toHaveLength(1)
+    expect(other).toHaveLength(1)
+
+    disposeSecond()
+    await handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+    expect(first).toHaveLength(2)
+
+    dispose()
+    const internals = session as unknown as SessionInternals
+    expect(internals.__emitEvent).toBeUndefined()
+  })
+
+  test('refuses an unknown channel rather than silently succeeding', async () => {
+    const { session } = setup()
+    await expect(handlers.emitEvent(session, { channel: 'nope', name: 'tick' })).rejects.toThrow(/has not been seen/)
+  })
+
+  test('refuses a released channel, whose listeners are gone', async () => {
     const { client, session } = setup()
     liveChannel(client, 'a')
     handlers.channelAction(session, { action: 'release', channel: 'a' })
 
-    expect(() =>
-      handlers.emitEvent(session, { channel: 'a', name: 'tick' }),
-    ).toThrow(/has been released/)
+    await expect(handlers.emitEvent(session, { channel: 'a', name: 'tick' })).rejects.toThrow(/has been released/)
   })
 
-  test('refuses an empty event name', () => {
+  test('refuses an empty event name', async () => {
     const { client, session } = setup()
     listening(channelOf(client, 'a'))
 
-    expect(() =>
-      handlers.emitEvent(session, { channel: 'a', name: '  ' }),
-    ).toThrow(/non-empty name/)
+    await expect(handlers.emitEvent(session, { channel: 'a', name: '  ' })).rejects.toThrow(/non-empty name/)
   })
 
-  test('reports when no client is instrumented', () => {
+  test('reports when no client is instrumented', async () => {
     const session = new Session()
     session.touchChannel('a')
     const internals = session as unknown as SessionInternals
     expect(internals.__emitEvent).toBeUndefined()
 
-    expect(() => handlers.emitEvent(session, { channel: 'a', name: 'tick' })).toThrow(
+    await expect(handlers.emitEvent(session, { channel: 'a', name: 'tick' })).rejects.toThrow(
       /no client is instrumented/,
     )
   })

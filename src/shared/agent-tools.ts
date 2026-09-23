@@ -203,8 +203,11 @@ export type EmitEventResult = {
   delivered: number
   /** Listeners passed over because their event-name filter did not match. */
   skipped: number
+  /** Includes async listeners whose promise rejected. */
   failed: number
   errors?: string[]
+  /** Async listeners still running when the tool stopped waiting for them. */
+  pending?: number
   note?: string
 }
 
@@ -453,7 +456,7 @@ export const ablyToolDefinitions = {
   emitEvent: defineAgentToolContract<EmitEventArgs, EmitEventResult>({
     name: 'emit-event',
     description:
-      'Deliver a synthetic message to the app’s own subscribers on a channel, locally. Nothing is published to Ably: no other connected client sees it, so this is safe to fire against a shared channel, works offline, and completes without a network round trip — which is what makes it usable in an automated test. It drives the app under test; it does not simulate the network. The channel must already appear in list-channels and the app must already have subscribed, or there is no listener to deliver to (delivered: 0 says so). Messages only — presence cannot be injected.',
+      'Deliver a synthetic message to the app’s own subscribers on a channel, locally. Nothing is published to Ably: no other connected client sees it, so this is safe to fire against a shared channel, works offline, and completes without a network round trip — which is what makes it usable in an automated test. It drives the app under test; it does not simulate the network. The channel must already appear in list-channels and the app must already have subscribed, or there is no listener to deliver to (delivered: 0 says so). Event-name and MessageFilter subscriptions are honoured as Ably would. Returns once async listeners settle (up to 2s), so a rejection is reported in failed/errors. Injected messages are recorded in list-events but not counted as inbound traffic. Messages only — presence cannot be injected.',
     inputSchema: {
       type: 'object',
       properties: {

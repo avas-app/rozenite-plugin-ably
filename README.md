@@ -167,9 +167,14 @@ version that is both safe on a shared channel and usable in a test.
 That also bounds what it can do: the app must already have subscribed, or there
 is no listener to deliver to. `delivered: 0` says exactly that, with a `note`
 explaining whether the channel had no listener at all or every listener filtered
-the name out. Injected events are recorded in the stream like any other, marked
+it out. Event-name and `MessageFilter` subscriptions are honoured as Ably would
+honour them. The call returns once async listeners settle (up to 2s), so a
+rejected promise is reported in `failed`/`errors` like a synchronous throw.
+
+Injected events are recorded in the stream like any other, marked
 `injected: true` and with their summary prefixed, so a listing never passes a
-synthetic event off as one Ably delivered.
+synthetic event off as one Ably delivered. They are not counted in the inbound
+traffic counters, which describe only what Ably delivered.
 
 Messages only — presence cannot be injected.
 

@@ -42,6 +42,7 @@ import type {
   SetOptionsResult,
   SortOrder,
 } from '../shared/agent-tools'
+import { INJECTION_SETTLE_MS } from './instrument'
 import type { InjectionOutcome, Session, SessionInternals } from './session'
 
 /** Upper bound on a page, so a bad `limit` cannot dump the whole buffer. */
@@ -384,20 +385,25 @@ let nextInjectionSerial = 1
  */
 function injectionNote(
   channel: string,
-  { eventId, delivered, skipped, failed }: InjectionOutcome,
+  { eventId, delivered, skipped, failed, pending }: InjectionOutcome,
 ): string | undefined {
   const notes: string[] = []
 
   if (delivered === 0) {
     notes.push(
       skipped > 0
-        ? `Nothing received it: all ${skipped} listener(s) on "${channel}" filter for other event names — read-channel shows each listener's events filter.`
+        ? `Nothing received it: all ${skipped} listener(s) on "${channel}" filter it out by name or message filter — read-channel shows each listener's events filter.`
         : `Nothing received it: "${channel}" has no app listener. The app must call subscribe() before an injection can reach it.`,
     )
   }
   if (failed > 0) {
     notes.push(
-      `${failed} listener(s) threw; see errors. The others still received it, exactly as they would from a real message.`,
+      `${failed} listener(s) threw or rejected; see errors. The others still received it, exactly as they would from a real message.`,
+    )
+  }
+  if (pending) {
+    notes.push(
+      `${pending} async listener(s) were still running after ${INJECTION_SETTLE_MS}ms; their outcome is not reported, and the app may not have finished reacting.`,
     )
   }
   if (eventId === undefined) {
@@ -409,10 +415,10 @@ function injectionNote(
   return notes.length > 0 ? notes.join(' ') : undefined
 }
 
-export function emitEvent(
+export async function emitEvent(
   session: Session,
   { channel, name, data, clientId, connectionId, messageId }: EmitEventArgs,
-): EmitEventResult {
+): Promise<EmitEventResult> {
   if (typeof name !== 'string' || name.trim() === '') {
     throw new Error(
       'emit-event requires a non-empty name — the message name an app subscribe(name, cb) filters on.',
@@ -440,7 +446,7 @@ export function emitEvent(
 
   const id = messageId ?? `injected:${nextInjectionSerial++}`
 
-  const outcome = internals.__emitEvent(channel, {
+  const outcome = await internals.__emitEvent(channel, {
     id,
     name,
     data,
@@ -467,6 +473,7 @@ export function emitEvent(
     skipped: outcome.skipped,
     failed: outcome.failed,
     errors: outcome.errors,
+    pending: outcome.pending,
     note: injectionNote(channel, outcome),
   }
 }

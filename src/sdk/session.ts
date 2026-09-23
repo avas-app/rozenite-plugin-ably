@@ -56,8 +56,11 @@ export type InjectionOutcome = {
   delivered: number
   /** Listeners passed over because their event-name filter did not match. */
   skipped: number
+  /** Rejections from async listeners are included. */
   failed: number
   errors?: string[]
+  /** Async listeners still running when the settle wait ran out. */
+  pending?: number
 }
 
 /**
@@ -69,11 +72,14 @@ export type InjectionOutcome = {
 export type SessionInternals = {
   __setProtocolCapture?: (enabled: boolean) => void
   __channelAction?: (action: string, channel: string) => void
-  /** Returns null when the channel has no live patch to deliver through. */
+  /**
+   * Resolves null when no client instrumented into this session has a live
+   * patch for the channel.
+   */
   __emitEvent?: (
     channel: string,
     message: InjectedMessage,
-  ) => InjectionOutcome | null
+  ) => Promise<InjectionOutcome | null>
 }
 
 export type SessionSink = {
@@ -183,7 +189,9 @@ export class Session {
     this.events.push(full)
     this.stats.totalEvents++
 
-    if (full.kind === 'message') {
+    // Injected messages are recorded but not counted as traffic: the counters
+    // describe what Ably actually delivered.
+    if (full.kind === 'message' && !full.injected) {
       if (full.dir === 'in') this.stats.messagesIn++
       else if (full.dir === 'out') this.stats.messagesOut++
     } else if (full.kind === 'presence') {
@@ -196,7 +204,7 @@ export class Session {
       const record = this.channels.get(full.channel)
       if (record) {
         record.lastActivity = full.ts
-        if (full.kind === 'message') {
+        if (full.kind === 'message' && !full.injected) {
           if (full.dir === 'in') record.counters.in++
           else if (full.dir === 'out') record.counters.out++
         } else if (full.kind === 'presence') {
