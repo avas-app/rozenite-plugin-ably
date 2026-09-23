@@ -77,6 +77,8 @@ export type AblyEventRow = {
   hasPayload: boolean
   /** Flattened error message, so the row stays one level deep. */
   error?: string
+  /** True when `emit-event` fabricated this row rather than Ably delivering it. */
+  injected?: boolean
 }
 
 /** One row in `list-channels`, with counters flattened for field projection. */
@@ -169,6 +171,42 @@ export type SetOptionsResult = { options: SdkOptions }
 
 export type ClearArgs = undefined
 export type ClearResult = { cleared: true }
+
+/**
+ * `channel`, `name` and `data` are the generic contract, satisfiable by any
+ * transport that can deliver an unrequested inbound message; the rest is Ably
+ * message metadata another provider would not have. Nothing app-specific belongs
+ * here — an app's own envelope travels inside `data`, whose shape is never
+ * inspected.
+ */
+export type EmitEventArgs = {
+  channel: string
+  /** As an app's `subscribe(name, cb)` would filter on. */
+  name: string
+  /** Arrives at the app's listener as `message.data`. */
+  data?: unknown
+  clientId?: string
+  connectionId?: string
+  /** Defaults to `injected:<n>`. */
+  messageId?: string
+}
+
+export type EmitEventResult = {
+  channel: string
+  name: string
+  /** Always true: delivered to this device's own subscribers, never published. */
+  local: true
+  messageId: string
+  /** Absent when capture is paused, which suppresses recording but not delivery. */
+  eventId?: number
+  /** Zero means nothing in the app reacted; `note` says why. */
+  delivered: number
+  /** Listeners passed over because their event-name filter did not match. */
+  skipped: number
+  failed: number
+  errors?: string[]
+  note?: string
+}
 
 export type ChannelActionArgs = { action: ChannelAction; channel: string }
 export type ChannelActionResult = {
@@ -313,7 +351,10 @@ export const ablyToolDefinitions = {
         'bytes',
         'hasPayload',
         'error',
+        'injected',
       ],
+      // `injected` is not default: the summary is prefixed anyway, so a default
+      // listing shows synthetic rows without a column on every real one.
       defaultFields: ['id', 'ts', 'kind', 'dir', 'channel', 'summary'],
     },
     readOnly: true,
@@ -400,5 +441,51 @@ export const ablyToolDefinitions = {
       required: ['action', 'channel'],
     },
     destructive: true,
+  }),
+
+  /**
+   * **The short name is a discovery key, not a label.** `AgentToolTraits` has no
+   * capability field, so a wrapper treating plugins as interchangeable providers
+   * of the *emit* capability can only find them by probing each domain for a tool
+   * named exactly `emit-event`. Do not decorate or rename it, and keep any
+   * companion's name equally plain.
+   */
+  emitEvent: defineAgentToolContract<EmitEventArgs, EmitEventResult>({
+    name: 'emit-event',
+    description:
+      'Deliver a synthetic message to the app’s own subscribers on a channel, locally. Nothing is published to Ably: no other connected client sees it, so this is safe to fire against a shared channel, works offline, and completes without a network round trip — which is what makes it usable in an automated test. It drives the app under test; it does not simulate the network. The channel must already appear in list-channels and the app must already have subscribed, or there is no listener to deliver to (delivered: 0 says so). Messages only — presence cannot be injected.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...channelNameProperty,
+        name: {
+          type: 'string',
+          description:
+            'Message name — the value an app’s subscribe(name, cb) filters on. A listener registered with a name filter receives only matching names; read-channel shows each listener’s filter.',
+        },
+        data: {
+          description:
+            'Message body, delivered verbatim as message.data. Any JSON value; the tool never interprets its shape, so an application’s own event envelope goes here.',
+        },
+        clientId: {
+          type: 'string',
+          description: 'Fabricated message.clientId, if the app reads it.',
+        },
+        connectionId: {
+          type: 'string',
+          description: 'Fabricated message.connectionId, if the app reads it.',
+        },
+        messageId: {
+          type: 'string',
+          description:
+            'Override the fabricated message.id. Defaults to injected:<n>, which is deliberately unlike Ably’s own id format.',
+        },
+      },
+      required: ['channel', 'name'],
+    },
+    // All three traits are absent, i.e. false. Not `readOnly` (the listener's
+    // work really happens) and not `idempotent` (two calls deliver twice), but
+    // not `destructive` either: it deletes and overwrites nothing, and claiming
+    // otherwise would make harnesses gate a tool that batch tests call unattended.
   }),
 } as const satisfies Record<string, AgentToolContract<unknown, unknown>>

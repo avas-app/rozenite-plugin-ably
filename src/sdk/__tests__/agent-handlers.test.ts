@@ -486,3 +486,238 @@ describe('channel-action', () => {
     ).toThrow(/no client is instrumented/)
   })
 })
+
+describe('emit-event', () => {
+  /** Subscribes a recording listener, optionally filtered by event name. */
+  function listening(channel: MockChannel, events?: string) {
+    const received: Record<string, unknown>[] = []
+    const listener = (message: Record<string, unknown>) => {
+      received.push(message)
+    }
+    if (events) channel.subscribe(events, listener)
+    else channel.subscribe(listener)
+    return received
+  }
+
+  test('hands the app’s own subscriber a message shaped like a real one', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'bid-orders')
+    const received = listening(channel)
+
+    const result = handlers.emitEvent(session, {
+      channel: 'bid-orders',
+      name: 'ride_assignment',
+      data: { rideId: 'r_42' },
+      clientId: 'dispatcher',
+    })
+
+    expect(result.delivered).toBe(1)
+    expect(result.local).toBe(true)
+    expect(result.note).toBeUndefined()
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({
+      name: 'ride_assignment',
+      data: { rideId: 'r_42' },
+      clientId: 'dispatcher',
+      encoding: null,
+    })
+    expect(received[0].id).toBe(result.messageId)
+    expect(typeof received[0].timestamp).toBe('number')
+  })
+
+  // The whole reason this tool injects locally: a real publish would reach every
+  // other client on the channel, including someone else's app or a real device.
+  test('never publishes to the real channel', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'bid-orders')
+    listening(channel)
+
+    handlers.emitEvent(session, {
+      channel: 'bid-orders',
+      name: 'ride_assignment',
+      data: { rideId: 'r_42' },
+    })
+
+    expect(channel.published).toEqual([])
+    expect(handlers.listEvents(session, { dir: 'out' }).items).toEqual([])
+  })
+
+  test('fabricates an id that cannot be mistaken for Ably’s own', () => {
+    const { client, session } = setup()
+    listening(channelOf(client, 'a'))
+
+    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(result.messageId).toStartWith('injected:')
+  })
+
+  test('honours an event-name filter, and counts what it passed over', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'bid-orders')
+    const matching = listening(channel, 'ride_assignment')
+    const other = listening(channel, 'ride_cancelled')
+    const unfiltered = listening(channel)
+
+    const result = handlers.emitEvent(session, {
+      channel: 'bid-orders',
+      name: 'ride_assignment',
+    })
+
+    expect(matching).toHaveLength(1)
+    expect(unfiltered).toHaveLength(1)
+    expect(other).toHaveLength(0)
+    expect(result.delivered).toBe(2)
+    expect(result.skipped).toBe(1)
+  })
+
+  test('records the injection exactly once, not twice via the spy', () => {
+    const { client, session } = setup()
+    // Subscribing is what installs the passive spy.
+    listening(channelOf(client, 'a'))
+
+    handlers.emitEvent(session, { channel: 'a', name: 'tick', data: '1' })
+
+    expect(handlers.listEvents(session, { kind: 'message' }).items).toHaveLength(1)
+  })
+
+  test('marks the recorded event injected, in the row and the summary', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'a')
+    listening(channel)
+    channel.deliver({ name: 'real', data: '1' })
+
+    const result = handlers.emitEvent(session, {
+      channel: 'a',
+      name: 'synthetic',
+      data: '2',
+    })
+
+    const rows = handlers.listEvents(session, { kind: 'message', order: 'asc' }).items
+    expect(rows.map((row) => row.injected)).toEqual([undefined, true])
+    expect(rows[1].summary).toBe('injected synthetic · 1B')
+    expect(rows[1].id).toBe(result.eventId!)
+  })
+
+  test('the recorded event carries the payload back to read-event', () => {
+    const { client, session } = setup()
+    listening(channelOf(client, 'a'))
+
+    const { eventId } = handlers.emitEvent(session, {
+      channel: 'a',
+      name: 'ride_assignment',
+      data: { rideId: 'r_42' },
+    })
+
+    const { event } = handlers.readEvent(session, { id: eventId! })
+    expect(event.injected).toBe(true)
+    expect(event.dir).toBe('in')
+    expect(event.payload?.value).toEqual({ rideId: 'r_42' })
+  })
+
+  test('sorts ahead of whatever the listener publishes in response', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'a')
+    channel.subscribe(() => {
+      channel.publish('ack', '1')
+    })
+
+    handlers.emitEvent(session, { channel: 'a', name: 'ride_assignment' })
+
+    expect(
+      handlers.listEvents(session, { kind: 'message', order: 'asc' }).items.map(
+        (row) => row.name,
+      ),
+    ).toEqual(['ride_assignment', 'ack'])
+  })
+
+  // Delivering to nobody is not an error: the event really was injected.
+  test('says so when the channel has no listener at all', () => {
+    const { client, session } = setup()
+    channelOf(client, 'a')
+
+    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(result.delivered).toBe(0)
+    expect(result.skipped).toBe(0)
+    expect(result.note).toMatch(/no app listener/)
+    expect(result.eventId).toBeDefined()
+  })
+
+  test('says so when every listener filtered the name out', () => {
+    const { client, session } = setup()
+    listening(channelOf(client, 'a'), 'something_else')
+
+    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(result.delivered).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(result.note).toMatch(/filter for other event names/)
+  })
+
+  test('one listener throwing does not stop the rest, and is reported', () => {
+    const { client, session } = setup()
+    const channel = channelOf(client, 'a')
+    channel.subscribe(() => {
+      throw new Error('reducer blew up')
+    })
+    const survivor = listening(channel)
+
+    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(survivor).toHaveLength(1)
+    expect(result.delivered).toBe(1)
+    expect(result.failed).toBe(1)
+    expect(result.errors).toEqual(['reducer blew up'])
+    expect(result.note).toMatch(/threw/)
+  })
+
+  test('delivers while paused, but reports that nothing was recorded', () => {
+    const { client, session } = setup()
+    const received = listening(channelOf(client, 'a'))
+    handlers.setOptions(session, { paused: true })
+
+    const result = handlers.emitEvent(session, { channel: 'a', name: 'tick' })
+
+    expect(received).toHaveLength(1)
+    expect(result.delivered).toBe(1)
+    expect(result.eventId).toBeUndefined()
+    expect(result.note).toMatch(/paused/)
+  })
+
+  test('refuses an unknown channel rather than silently succeeding', () => {
+    const { session } = setup()
+    expect(() =>
+      handlers.emitEvent(session, { channel: 'nope', name: 'tick' }),
+    ).toThrow(/has not been seen/)
+  })
+
+  test('refuses a released channel, whose listeners are gone', () => {
+    const { client, session } = setup()
+    liveChannel(client, 'a')
+    handlers.channelAction(session, { action: 'release', channel: 'a' })
+
+    expect(() =>
+      handlers.emitEvent(session, { channel: 'a', name: 'tick' }),
+    ).toThrow(/has been released/)
+  })
+
+  test('refuses an empty event name', () => {
+    const { client, session } = setup()
+    listening(channelOf(client, 'a'))
+
+    expect(() =>
+      handlers.emitEvent(session, { channel: 'a', name: '  ' }),
+    ).toThrow(/non-empty name/)
+  })
+
+  test('reports when no client is instrumented', () => {
+    const session = new Session()
+    session.touchChannel('a')
+    const internals = session as unknown as SessionInternals
+    expect(internals.__emitEvent).toBeUndefined()
+
+    expect(() => handlers.emitEvent(session, { channel: 'a', name: 'tick' })).toThrow(
+      /no client is instrumented/,
+    )
+  })
+})

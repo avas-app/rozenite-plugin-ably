@@ -136,6 +136,7 @@ npx rozenite agent avasapp/ably call --tool list-channels \
 | `set-options` | `paused`, `captureProtocol`, `maxEvents`. |
 | `clear` | Discard captured events. |
 | `channel-action` | `attach` / `detach` / `release`. |
+| `emit-event` | Deliver a synthetic message to the app's own subscribers, locally. |
 
 `list-events` deliberately omits payload bodies — a single message can carry
 hundreds of kilobytes, so a page of them would be unreadable. Find the id in a
@@ -143,8 +144,52 @@ listing, then `read-event` for the one that matters, which itself clips to 8 KB
 unless you raise `maxBytes`. `search` covers decoded payload contents, which is
 how you answer "which message carried this device id".
 
-Only `set-options`, `clear` and `channel-action` change anything, and only
-`channel-action` touches Ably itself rather than what is recorded.
+Only `set-options`, `clear`, `channel-action` and `emit-event` change anything,
+and only `channel-action` touches Ably itself rather than what is recorded.
+
+### Firing an event without a backend
+
+`emit-event` makes a realtime event arrive in the running app with no server,
+no publish, and no network round trip:
+
+```bash
+npx rozenite agent avasapp/ably call --tool emit-event --session <id> \
+  --args '{"channel":"bid-orders","name":"ride_assignment","data":{"rideId":"r_42"}}'
+```
+
+It hands a fabricated `Ably.Message` straight to the listeners the app itself
+registered with `subscribe()`. **It never publishes.** A real publish would fan
+the message out to every other client attached to that channel — another
+developer's app, or a real device — and would need the network, so it could
+neither run offline nor complete deterministically. Local delivery is the only
+version that is both safe on a shared channel and usable in a test.
+
+That also bounds what it can do: the app must already have subscribed, or there
+is no listener to deliver to. `delivered: 0` says exactly that, with a `note`
+explaining whether the channel had no listener at all or every listener filtered
+the name out. Injected events are recorded in the stream like any other, marked
+`injected: true` and with their summary prefixed, so a listing never passes a
+synthetic event off as one Ably delivered.
+
+Messages only — presence cannot be injected.
+
+#### The name and the three arguments are a contract
+
+`emit-event` is this plugin's implementation of a general capability — deliver an
+inbound message the app never asked for — and Ably is only one transport that
+could provide it. Push notifications and SSE deep links could satisfy the same
+shape later.
+
+Rozenite's `AgentToolTraits` has no capability field, so a wrapper that wants to
+treat plugins as interchangeable providers has to discover them by convention:
+enumerate the domains, then probe each for a tool named exactly `emit-event`.
+That makes the short name a discovery key rather than a label, so it is not
+decorated and will not be renamed. `channel`, `name` and `data` are the generic
+arguments; everything else the tool accepts is optional Ably message metadata
+that another transport would simply not have.
+
+Nothing application-specific belongs in the signature. An app's own event
+envelope is carried inside `data`, whose shape the tool never inspects.
 
 For Node scripts built on `@rozenite/agent-sdk`, typed descriptors keep tool
 names and argument shapes checked:

@@ -105,4 +105,11 @@ export function useAblyAgentTools({
     enabled,
     handler: (args) => handlers.channelAction(requireSession(sessionRef), args),
   })
+
+  useRozenitePluginAgentTool({
+    pluginId: PLUGIN_ID,
+    tool: ablyToolDefinitions.emitEvent,
+    enabled,
+    handler: (args) => handlers.emitEvent(requireSession(sessionRef), args),
+  })
 }

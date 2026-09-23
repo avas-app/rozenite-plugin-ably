@@ -1,6 +1,6 @@
 ---
 name: ably-devtools
-description: "Inspect Ably Realtime in a running React Native app through the @avasapp/rozenite-plugin-ably DevTools plugin — channels, live event stream, decoded payloads — via the `avasapp/ably` Rozenite agent domain. Use for any realtime debugging question, such as a channel that is not attached, a message that did not arrive, a payload whose contents are in doubt, or a connection that keeps failing."
+description: "Inspect Ably Realtime in a running React Native app through the @avasapp/rozenite-plugin-ably DevTools plugin — channels, live event stream, decoded payloads — via the `avasapp/ably` Rozenite agent domain. Use for any realtime debugging question, such as a channel that is not attached, a message that did not arrive, a payload whose contents are in doubt, or a connection that keeps failing. Also use to fire a synthetic realtime event into the running app with no backend and no publish, which is how an automated test triggers realtime behaviour."
 ---
 
 # Ably Realtime inspection
@@ -46,6 +46,7 @@ of the ring buffer — restart the listing, do not treat it as "no more rows".
 | `set-options` | `paused`, `captureProtocol`, `maxEvents`. Touches capture only, never Ably. |
 | `clear` | Discards captured events. Destructive. |
 | `channel-action` | `attach` / `detach` / `release`. **Changes real Ably state.** |
+| `emit-event` | Deliver a synthetic message to the app's own subscribers, locally. Never publishes. |
 
 `search` on `list-events` matches the decoded payload as well as the summary,
 name and channel — it is how you find "which message carried this device id".
@@ -83,6 +84,12 @@ kilobytes, which is worth spending deliberately rather than by accident.
 JSON *string*; the plugin parses it into `kind: "json"` and keeps the original
 in `raw`. Only strings that trim to `{...}` or `[...]` get that treatment, so a
 JSON scalar stays a plain string.
+
+**An injected event is marked as one.** `emit-event` rows carry
+`injected: true` and their summary is prefixed with `injected `, which shows up
+in a default listing. If you are asserting that the app received something real,
+check that marker — otherwise an earlier injection in the same session reads as
+proof the backend delivered it.
 
 **Channels are retained after detach and release.** `state` and `released`
 together tell you live vs idle vs gone. "The channel I expected isn't there" is
@@ -124,6 +131,55 @@ reasoning about a buffer full of unrelated history.
 
 Use `channel-action` only when the user has asked to change app state. `release`
 drops the channel and its listeners in the running app.
+
+## Firing an event with no backend
+
+`emit-event` makes a realtime event arrive in the running app without a server.
+
+```bash
+npx rozenite agent avasapp/ably call --tool emit-event --session <id> \
+  --args '{"channel":"bid-orders","name":"ride_assignment","data":{"rideId":"r_42"}}'
+```
+
+It hands a fabricated `Ably.Message` to the listeners the app registered with
+`subscribe()`, in-process. **It never publishes to Ably.** That is deliberate,
+not a limitation: a real publish reaches every other client attached to the
+channel — another developer's app, or a real device — and needs a network round
+trip, so it could neither run offline nor complete deterministically in a test.
+
+What this means when you use it:
+
+- **The app must already have subscribed.** There is no listener otherwise.
+  `delivered: 0` tells you so, with a `note` distinguishing "no listener on this
+  channel" from "every listener filters for other event names". Check
+  `read-channel` for each listener's `events` filter before assuming the name is
+  wrong.
+- **`name` has to match the filter.** A listener registered as
+  `subscribe('ride_assignment', cb)` receives nothing else; an unfiltered
+  `subscribe(cb)` receives everything.
+- **It is not idempotent.** Two calls deliver twice, and the app reacts twice.
+- **Keep `data` JSON-safe.** The listener receives the value you passed; the
+  recorded event stores a JSON copy. So `undefined` fields silently vanish from
+  the record and `NaN`/`Infinity` become `null`, with no marker — leaving the app
+  and `read-event` disagreeing about what arrived. This applies to any payload
+  assembled in JS — including a schema-generated one you then patch, say to stamp
+  a real timestamp. A payload that came from JSON round-trips unchanged.
+- **Whatever the listener does really happens** — navigation, a write, a refetch.
+  It is not marked destructive, because it deletes and overwrites nothing, but it
+  is not read-only either: it drives the app under test.
+- **A listener that throws is reported, not hidden.** `failed` and `errors` name
+  it; the other listeners still received the message, as they would from a real
+  one. A throwing reducer is an app bug the injection just surfaced.
+- **While `paused`, delivery still happens but nothing is recorded.** `eventId`
+  comes back absent and the `note` says so.
+
+**The injected event alone may not be enough.** Many apps treat their API
+snapshot as the source of truth and use realtime only as a trigger to re-read it.
+In that design an injection changes what the app *does* but not what the API
+returns, so the next sync overwrites it and the assertion fails for reasons that
+have nothing to do with the event. Stub the snapshot first — that is what
+`@avasapp/rozenite-plugin-data-seed` is for — then fire the event, then assert.
+`emit-event` owns only the middle step.
 
 ## Setup
 

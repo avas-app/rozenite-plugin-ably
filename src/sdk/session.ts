@@ -36,6 +36,31 @@ const CHANNEL_FLUSH_MS = 200
 const DEFAULT_MAX_EVENTS = 1000
 
 /**
+ * A message fabricated by `emit-event`, shaped like the `Ably.Message` the app's
+ * listener is written against — anything missing here reads as `undefined` in
+ * app code a real message would have populated.
+ */
+export type InjectedMessage = {
+  id: string
+  name: string
+  data: unknown
+  clientId?: string
+  connectionId?: string
+  timestamp: number
+  encoding: null
+}
+
+export type InjectionOutcome = {
+  /** Absent while paused, which suppresses recording but not delivery. */
+  eventId?: number
+  delivered: number
+  /** Listeners passed over because their event-name filter did not match. */
+  skipped: number
+  failed: number
+  errors?: string[]
+}
+
+/**
  * Device-side actions that `instrumentClient` attaches to a session after
  * construction, rather than widening `Session`'s public API with methods that
  * only mean anything once a client is patched. Declared here so every consumer
@@ -44,6 +69,11 @@ const DEFAULT_MAX_EVENTS = 1000
 export type SessionInternals = {
   __setProtocolCapture?: (enabled: boolean) => void
   __channelAction?: (action: string, channel: string) => void
+  /** Returns null when the channel has no live patch to deliver through. */
+  __emitEvent?: (
+    channel: string,
+    message: InjectedMessage,
+  ) => InjectionOutcome | null
 }
 
 export type SessionSink = {
@@ -135,9 +165,14 @@ export class Session {
    *
    * While paused, events are dropped entirely rather than buffered — a paused
    * inspector should not silently accumulate memory in the app under test.
+   *
+   * Returns the assigned id, or undefined while paused, so `emit-event` can
+   * point its caller at the event — or say there is none to read.
    */
-  push(event: Omit<AblyEvent, 'id' | 'ts'> & { ts?: number }): void {
-    if (this.options.paused) return
+  push(
+    event: Omit<AblyEvent, 'id' | 'ts'> & { ts?: number },
+  ): number | undefined {
+    if (this.options.paused) return undefined
 
     const full: AblyEvent = {
       ...event,
@@ -176,6 +211,8 @@ export class Session {
     this.pendingEvents.push(full)
     if (this.pendingEvents.length >= MAX_BATCH) this.flushEvents()
     else this.scheduleFlush()
+
+    return full.id
   }
 
   private trim() {
