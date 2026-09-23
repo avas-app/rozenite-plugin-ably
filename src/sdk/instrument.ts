@@ -1,6 +1,11 @@
 import type { AblyEvent, ChannelState, ConnectionState } from '../shared/types'
 import { serializeError, serializePayload } from './serialize'
-import type { InjectedMessage, InjectionOutcome, Session } from './session'
+import type {
+  InjectedMessage,
+  InjectionOutcome,
+  Session,
+  SessionInternals,
+} from './session'
 
 /**
  * Instruments a live `Ably.Realtime` client by patching its public surface.
@@ -99,7 +104,21 @@ type ChannelPatch = {
   spyListener: AnyFn | null
   presenceSpy: AnyFn | null
   /** App listener registrations, so unsubscribe can find the right record. */
-  registrations: { id: number; listener: unknown; events?: string[] }[]
+  registrations: {
+    id: number
+    listener: unknown
+    events?: string[]
+    filter?: MessageFilter
+  }[]
+}
+
+/** Ably's `MessageFilter`, as far as `emit-event` has to evaluate it. */
+type MessageFilter = {
+  name?: unknown
+  clientId?: unknown
+  isRef?: unknown
+  refType?: unknown
+  refTimeserial?: unknown
 }
 
 /** Runs bookkeeping so that a throw can never escape into the app's call path. */
@@ -169,6 +188,7 @@ function describePublish(args: unknown[]): { name?: string; data: unknown }[] {
 /** Extracts the event-name filter (if any) from a `subscribe()` call. */
 function describeSubscribe(args: unknown[]): {
   events?: string[]
+  filter?: MessageFilter
   listener: unknown
 } {
   const [first, second] = args
@@ -182,8 +202,37 @@ function describeSubscribe(args: unknown[]): {
     }
   }
   // MessageFilter object form — the filter is not a plain event-name list.
-  if (first && typeof first === 'object') return { listener: second }
+  if (first && typeof first === 'object') {
+    return { filter: first as MessageFilter, listener: second }
+  }
   return { listener: undefined }
+}
+
+/**
+ * Whether Ably would hand `message` to a listener subscribed with `filter`.
+ * An injected message carries no `extras.ref`, so any reference criterion
+ * other than `isRef: false` excludes it.
+ */
+function matchesFilter(filter: MessageFilter, message: InjectedMessage): boolean {
+  if (filter.name !== undefined && filter.name !== message.name) return false
+  if (filter.clientId !== undefined && filter.clientId !== message.clientId) {
+    return false
+  }
+  return (
+    filter.isRef !== true &&
+    filter.refType === undefined &&
+    filter.refTimeserial === undefined
+  )
+}
+
+/**
+ * How long `emit-event` waits for async listeners to settle, so a rejection is
+ * reported and the app's async reaction has finished before the caller asserts.
+ */
+export const INJECTION_SETTLE_MS = 2000
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function summarisePayloadSize(bytes?: number): string {
@@ -421,9 +470,9 @@ export function instrumentClient(
     ;(channel as { subscribe: AnyFn }).subscribe = ((...args: unknown[]) => {
       let id: number | null = null
       guard(() => {
-        const { events, listener } = describeSubscribe(args)
+        const { events, filter, listener } = describeSubscribe(args)
         id = session.addListener(channel.name, undefined, events)
-        patch.registrations.push({ id, listener, events })
+        patch.registrations.push({ id, listener, events, filter })
       })
 
       try {
@@ -704,13 +753,17 @@ export function instrumentClient(
    * the channel — another developer's app, or a real device — and needs the
    * network, so it could neither run offline nor complete deterministically
    * inside a test.
+   *
+   * Listeners run synchronously, as Ably calls them; only waiting for the
+   * promises async ones return happens after.
    */
-  function emitEvent(
+  async function emitEvent(
     name: string,
     message: InjectedMessage,
-  ): InjectionOutcome | null {
+  ): Promise<InjectionOutcome | null> {
     const patch = patches.get(name)
-    if (!patch) return null
+    // Another client instrumented into the same session may own the channel.
+    if (!patch) return previousEmitEvent?.(name, message) ?? null
 
     // Before delivery, so the injection sorts ahead of anything a listener
     // publishes in response. The spy is not invoked: it would record a second
@@ -735,9 +788,10 @@ export function instrumentClient(
     let delivered = 0
     let skipped = 0
     const errors: string[] = []
+    const running: PromiseLike<unknown>[] = []
 
     // Copied: a listener may subscribe or unsubscribe while it runs.
-    for (const { listener, events } of [...patch.registrations]) {
+    for (const { listener, events, filter } of [...patch.registrations]) {
       if (typeof listener !== 'function') {
         skipped++
         continue
@@ -746,13 +800,57 @@ export function instrumentClient(
         skipped++
         continue
       }
+      if (filter && !matchesFilter(filter, message)) {
+        skipped++
+        continue
+      }
       try {
-        ;(listener as AnyFn)(message)
-        delivered++
+        const result = (listener as AnyFn)(message)
+        if (result && typeof result.then === 'function') running.push(result)
+        else delivered++
       } catch (error) {
         // Isolated per listener as ably-js's own `callListener` is, but reported
         // rather than swallowed: an agent driving a test needs to know.
-        errors.push(error instanceof Error ? error.message : String(error))
+        errors.push(errorMessage(error))
+      }
+    }
+
+    let pending = 0
+    if (running.length > 0) {
+      const settled: ({ error: string } | true | undefined)[] = running.map(
+        () => undefined,
+      )
+      // Each promise gets a rejection handler, so one that rejects after the
+      // wait is still never an unhandled rejection in the app.
+      const all = Promise.all(
+        running.map((result, i) =>
+          Promise.resolve(result).then(
+            () => {
+              settled[i] = true
+            },
+            (error) => {
+              settled[i] = { error: errorMessage(error) }
+            },
+          ),
+        ),
+      )
+      let timer: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([
+        all,
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, INJECTION_SETTLE_MS)
+        }),
+      ])
+      clearTimeout(timer)
+
+      for (const outcome of settled) {
+        if (outcome === true) delivered++
+        else if (outcome) errors.push(outcome.error)
+        else {
+          // Still running: it did receive the message, it just has not finished.
+          delivered++
+          pending++
+        }
       }
     }
 
@@ -762,10 +860,13 @@ export function instrumentClient(
       skipped,
       failed: errors.length,
       errors: errors.length > 0 ? errors : undefined,
+      pending: pending > 0 ? pending : undefined,
     }
   }
 
-  ;(session as unknown as Record<string, unknown>).__emitEvent = emitEvent
+  const internals = session as unknown as SessionInternals
+  const previousEmitEvent = internals.__emitEvent
+  internals.__emitEvent = emitEvent
 
   // ---------------------------------------------------------------- dispose
 
@@ -773,6 +874,10 @@ export function instrumentClient(
     for (const patch of patches.values()) unpatchChannel(patch)
     patches.clear()
     for (const restore of restorers) restore()
+    // Only if nothing chained on top since, which still delegates through us.
+    if (internals.__emitEvent === emitEvent) {
+      internals.__emitEvent = previousEmitEvent
+    }
     delete marked[INSTRUMENTED]
   }
 }

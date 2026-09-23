@@ -151,12 +151,15 @@ What this means when you use it:
 
 - **The app must already have subscribed.** There is no listener otherwise.
   `delivered: 0` tells you so, with a `note` distinguishing "no listener on this
-  channel" from "every listener filters for other event names". Check
+  channel" from "every listener filters it out". Check
   `read-channel` for each listener's `events` filter before assuming the name is
   wrong.
 - **`name` has to match the filter.** A listener registered as
   `subscribe('ride_assignment', cb)` receives nothing else; an unfiltered
-  `subscribe(cb)` receives everything.
+  `subscribe(cb)` receives everything. A `MessageFilter` object is evaluated as
+  Ably would: `name` and `clientId` must match, and a reference filter
+  (`isRef: true`, `refType`, `refTimeserial`) never matches, since an injected
+  message has no `extras.ref`.
 - **It is not idempotent.** Two calls deliver twice, and the app reacts twice.
 - **Keep `data` JSON-safe.** The listener receives the value you passed; the
   recorded event stores a JSON copy. So `undefined` fields silently vanish from
@@ -170,6 +173,12 @@ What this means when you use it:
 - **A listener that throws is reported, not hidden.** `failed` and `errors` name
   it; the other listeners still received the message, as they would from a real
   one. A throwing reducer is an app bug the injection just surfaced.
+- **Async listeners are awaited, up to 2s.** The call returns once they settle,
+  so a rejection lands in `failed`/`errors` and the app has finished reacting
+  before you assert. One still running at 2s is counted in `pending`, and the
+  `note` warns that its outcome is unknown.
+- **It is recorded, not counted.** The injected row appears in `list-events`,
+  but `get-stats` and the channel's `in` counter only count what Ably delivered.
 - **While `paused`, delivery still happens but nothing is recorded.** `eventId`
   comes back absent and the `note` says so.
 
