@@ -24,7 +24,7 @@ jobs:
     outputs:
       pushed: ${{ steps.commit.outputs.pushed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.head_ref }}
 
@@ -61,7 +61,7 @@ jobs:
       && needs.lockfile.outputs.pushed != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-node@v4
         with:
